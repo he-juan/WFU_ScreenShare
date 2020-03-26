@@ -1,13 +1,12 @@
 
 var gulp = require('gulp');
+const babel = require('gulp-babel');
 var concat = require('gulp-concat');  // 合并文件。
 var uglify = require('gulp-uglify');   // 压缩js文件大小
 var foreach = require('gulp-foreach');  // 文件循环
-var order = require("gulp-order");
 var gutil = require('gulp-util');    // 处理日志相关的信息
 var combiner = require('stream-combiner2');  // 处理错误
 var sourcemaps = require('gulp-sourcemaps');   // source map生成
-var javascriptObfuscator = require('gulp-javascript-obfuscator');   //js压缩混淆的gulp插件
 var git = require('gulp-git');  //改变版本号以及创建一个 git tag
 var fs = require('fs');
 
@@ -54,6 +53,9 @@ gulp.task('allPackageMerge', function () {
                 console.log(file.path);
                 return stream;
             }))
+            // .pipe(babel({
+            //     presets:['@babel/preset-env']
+            // }))
             .pipe(concat('gsRTC.min.js')),
         sourcemaps.init(),
         // uglify({

@@ -13,9 +13,12 @@
     "express": "3.x"
   },
   "devDependencies": {
+    "@babel/core": "^7.9.0",
+    "babel-preset-env": "^1.7.0",
     "concat": "^1.0.3",
     "fs": "0.0.1-security",
     "gulp": "^3.9.1",
+    "gulp-babel": "^8.0.0",
     "gulp-clean": "^0.3.2",
     "gulp-concat": "^2.6.1",
     "gulp-foreach": "^0.1.0",
