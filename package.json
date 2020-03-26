@@ -1,25 +1,35 @@
 {
-  "name": "gvc_screen_share",
+  "name": "ipvt_webrtc_client_base",
   "version": "1.0.0",
-  "description": "",
-  "main": "./index.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rollup -c rollup.config.js"
+    "start": "gulp dev",
+    "dev": "gulp dev",
+    "clean": "rimraf dist",
+    "build": "rimraf dist && gulp build"
   },
-  "author": "chrou",
-  "dependencies": {},
+  "dependencies": {
+    "express": "3.x"
+  },
   "devDependencies": {
-    "@babel/cli": "^7.5.5",
-    "@babel/core": "^7.5.5",
-    "@babel/polyfill": "^7.4.4",
-    "@babel/preset-env": "^7.5.5",
-    "jquery": "^3.4.1",
-    "rollup": "^1.19.4",
-    "rollup-plugin-babel": "^4.3.3",
-    "rollup-plugin-commonjs": "^10.0.2",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-uglify": "^6.0.2",
-    "ws": "^7.2.0"
+    "concat": "^1.0.3",
+    "fs": "0.0.1-security",
+    "gulp": "^3.9.1",
+    "gulp-clean": "^0.3.2",
+    "gulp-concat": "^2.6.1",
+    "gulp-foreach": "^0.1.0",
+    "gulp-git": "^2.9.0",
+    "gulp-javascript-obfuscator": "^1.1.5",
+    "gulp-mini-css": "^0.0.3",
+    "gulp-order": "^1.2.0",
+    "gulp-requirejs-optimize": "^0.3.2",
+    "gulp-sourcemaps": "^2.6.5",
+    "gulp-uglify": "^1.5.4",
+    "gulp-util": "^3.0.8",
+    "stream-combiner2": "^1.1.1",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0",
+    "webpack-dev-server": "^3.2.1"
   }
 }

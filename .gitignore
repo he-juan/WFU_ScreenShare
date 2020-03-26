@@ -4,3 +4,9 @@
 /.externalToolBuilders/
 /.settings/
 .idea/
+/package-lock.json/
+/node_modules/
+
+/conference/
+/tests/
+/docs/

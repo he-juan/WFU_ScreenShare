@@ -708,7 +708,7 @@ var SDPTools = {
         } else {
             log.log("Error index");
         }
-    }, 
+    },
 
     /*Process bandwidth relative: b line and x-google-start-bitrate*/
     setMediaBandwidth: function(session, index, bandwidth) {
@@ -854,7 +854,7 @@ var SDPTools = {
                 }
 
                 /*Modified the mid*/
-                sessions[i].media[j].mid = id; 
+                sessions[i].media[j].mid = id;
 
                 id += 1;
             }
@@ -927,7 +927,7 @@ var SDPTools = {
     /*Split SDP, return SDP STRING array*/
     splitSDP: function(SDP) {
         let sdpArray = new Array();
-        let session = this.parseSDP(SDP); 
+        let session = this.parseSDP(SDP);
 
         if ( session.groups === undefined ) {
             log.log("No GROUP information, need to split m lines to each pc");
@@ -941,7 +941,7 @@ var SDPTools = {
                 item['msid'] = session.media[i].msid;
                 item['mid'] = 0;
                 item['mappedMID'] = session.media[i].mid;
-                this.midMap.push(item); 
+                this.midMap.push(item);
             }
         }
 
@@ -956,7 +956,7 @@ var SDPTools = {
                 delete sess.msidSemantics;
             }
             let media = new Array();
-            
+
             if ( typeof( sess.groups[0].mids ) === 'number' ) {
                 for (let j = 0; j < sess.media.length; j +=1 ) {
                     if ( sess.media[j].mid === sess.groups[0].mids ) {

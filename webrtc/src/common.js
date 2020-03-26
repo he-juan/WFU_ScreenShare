@@ -50,10 +50,9 @@ function closeStream(stream) {
  * @returns {string}
  */
 function typeJudgement(data) {
-    let result
     let type = Object.prototype.toString.call(data)
     let endIndex = type.indexOf(']')
-    result = type.substring(8, endIndex).toLocaleLowerCase()
+    let result = type.substring(8, endIndex).toLocaleLowerCase()
     console.log("current match case: ", result)
     return result
 }

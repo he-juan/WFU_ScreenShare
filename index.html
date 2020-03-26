@@ -1,31 +1,16 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>WFU Basic peer connection demo</title>
-    <script type="text/javascript" src="src/debug.js"></script>
-    <script type="text/javascript" src="src/adapter.js"></script>
-    <script type="text/javascript" src="src/sdp_tools.js"></script>
-    <script type="text/javascript" src="src/webSocket.js"></script>
-    <script>
-        /******************************************************************************************************/
-        /** 日志 **/
-        /******************************************************************************************************/
-        /*Log Debug Start*/
-        if (localStorage.debug === undefined) {
-            localStorage.debug = "*:INFO,*:WARN,*:ERROR";
-        }
-
-        let log = {};
-        log.debug = window.debug("JSEP:DEBUG");
-        log.log = window.debug("JSEP:LOG");
-        log.info = window.debug("JSEP:INFO");
-        log.warn = window.debug("JSEP:WARN");
-        log.error = window.debug("JSEP:ERROR");
-        /*Log Debug End*/
-    </script>
+    <meta charset="UTF-8">
+    <title>WUF 联调demo</title>
+    <script src="./webrtc/src/debug.js"></script>
+    <script type="text/javascript" src="./webrtc/src/sdp_tools.js"></script>
+    <script src="./webrtc/src/mediaDevice.js"></script>
+    <script type="text/javascript" src="./webrtc/src/common.js"></script>
     <style>
+        body{
+            background-image: linear-gradient(to right, #46d3e5 , #7abab6);
+        }
         .video-setting audio,video{
             border: 1px solid #b95050;
             width: 300px;
@@ -38,25 +23,40 @@
             font-size: 15px;
             width: 200px;
         }
+        .btn-default{
+            width: 150px;
+            height: 40px;
+            background-color: #cf5248;
+            color: white;
+            margin: 8px 5px;
+            padding: 3px;
+            border: 0;
+            border-radius: 8px;
+            transition: all 200ms;
+            min-width: 150px;
+            font-size: medium;
+        }
     </style>
 </head>
 <body>
 
+
 <h1>Local audio/video</h1>
+
 <div class="video-setting">
     <table>
         <thead>
         <tr>
-            <th>localVideo1</th>
+            <th>localVideo</th>
             <th>localVideo2</th>
             <th>localPresent</th>
         </tr>
         </thead>
         <tbody>
         <tr>
-            <td><video id="localVideo1" playsinline autoplay></video></td>
+            <td><video id="localVideo" playsinline autoplay></video></td>
             <td><video id="localVideo2" playsinline autoplay></video></td>
-            <td><video id="localPresent" playsinline autoplay></video></td>
+            <td><video id="localPresentVideo" playsinline autoplay></video></td>
             <td><audio id="localAudio" autoplay muted></audio></td>
         </tr>
         </tbody>
@@ -68,29 +68,60 @@
     <table>
         <thead>
         <tr>
-            <th>remoteVideo1</th>
+            <th>remoteVideo</th>
             <th>remoteVideo2</th>
             <th>remotePresent</th>
         </tr>
         </thead>
         <tbody>
         <tr>
-            <td><video id="remoteVideo1" playsinline autoplay></video></td>
+            <td><video id="remoteVideo" playsinline autoplay></video></td>
             <td><video id="remoteVideo2" playsinline autoplay></video></td>
-            <td><video id="remotePresent" playsinline autoplay></video></td>
+            <td><video id="remotePresentVideo" playsinline autoplay></video></td>
             <td><audio id="remoteAudio" autoplay></audio></td>
         </tr>
         </tbody>
     </table>
 </div>
 
+<div>
+    <!--本地服务器-->
+    <input type="text" value="ws://192.168.131.180:10200" class="form-control"  id="wsAddr" style="background: white;color: black;width:390px;display:inline">
+    <!--IPVT服务器-->
+    <!--<input type="text" value="wss://xmeetings.ipvideotalk.com:443/ws" class="form-control"  id="wsAddr" style="width:390px;display:inline">-->
+    <button type="button" class="btn btn-default" onclick="addWebSocket();" >连接</button>
+    <input type="button" class="btn-default" value="挂断"  onclick="hangup()">
 
-<input type="button" value="start basic peer connection" onclick="start()">
+    <hr>
+    <button type="button" class="btn btn-default" onclick="startPresent(1);" >开启演示</button>
+    <button type="button" class="btn btn-default" onclick="startPresent(0);" >关闭演示</button>
+    </button>
+    <!--    </div>-->
+</div>
 
-<input type="button" value="hangup" style="background: #737373;" onclick="hangup()">
 
-<script type="text/javascript" src="src/peer.js"></script>
-<script type="text/javascript" src="src/common.js"></script>
-<script type="text/javascript" src="src/main.js"></script>
+<!--取流：加载canvas动画-->
+<canvas id="canvasForCaptureStream" width="700px" height="700px" style=" background-image: url(background.jfif); display: none;float: left;"></canvas>
+<canvas id='slidesCanvas' width="700px" height="700px" style="display: none;float: left;"></canvas>
+<script src="./canvas_curve_animation.js"></script>
+<!--取流：结束加载canvas动画-->
+
+<script src="./webrtc/src/gsrtc.js"></script>
+<script src="./webrtc/src/gsrtc_api.js"></script>
+<script src="./webrtc/src/gsrtc_sdp.js"></script>
+<script src="./webrtc/src/gsrtc_code.js"></script>
+<script src="./webrtc/src/gsrtc_common.js"></script>
+<script src="./webrtc/src/gsrtc_signaling.js"></script>
+<script src="./webrtc/src/gsrtc_jsep.js"></script>
+<script src="./webrtc/src/gsrtc_connection.js"></script>
+<script src="./webrtc/src/gsrtc_constants.js"></script>
+<script src="./webrtc/src/gsrtc_event.js"></script>
+<script src="./webrtc/src/gsrtc_stream.js"></script>
+<script src="./webrtc/src/gsrtc_ice.js"></script>
+<script src="./webrtc/src/gsrtc_resolution.js"></script>
+<script src="./webrtc/src/gsrtc_sdp.js"></script>
+<script src="./webrtc/src/gsrtc_websocket.js"></script>
+<!--<script src="dist/gsRTC.min.js"></script>-->
+<script src="index.js"></script>
 </body>
 </html>
