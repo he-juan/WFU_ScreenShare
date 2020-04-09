@@ -124,25 +124,26 @@ GsRTC.prototype.inviteCall = function (sipCallInfo,callback) {
 /**
  * Leave the meeting
  */
-GsRTC.prototype.hangup = function () {
+GsRTC.prototype.closePeerConn = function () {
     if(!this.RTCSession){
         log.error("RTCSession is not initialized")
         return
     }
     try {
-        for (let key in this.RTCSession.peerConnections) {
-            let pc = this.RTCSession.peerConnections[key];
-            // close stream
-            let type = this.RTCSession.getStreamType(pc.type, true)
-            this.RTCSession.closeStream(this.MEDIA_STREAMS[type])
-
-            // close peerConnection
-            pc.getSenders().forEach(sender => {
-                delete sender.track
-                sender.replaceTrack(null)
-            })
-            pc.close()
+        // close stream
+        for (let key in this.MEDIA_STREAMS) {
+            let stream = this.MEDIA_STREAMS[key];
+            this.RTCSession.closeStream(stream)
         }
+
+        let pc = this.RTCSession.peerConnections['multiStreamPeer']
+        // close peerConnection
+        pc.getSenders().forEach(sender => {
+            delete sender.track
+            sender.replaceTrack(null)
+        })
+        pc.close()
+        this.RTCSession = null
     }catch (e) {
         log.error(e)
     }
@@ -380,15 +381,8 @@ GsRTC.prototype.shareScreen = function(data) {
             log.info('get stream success, ' + event.stream.id)
             let stream = event.stream
             stream.oninactive= function () {
-                This.action = 'stopShareScreen'
-                window.isPresentShare = 'stop'
                 log.warn("user clicks the bottom share bar to stop sharing")
-                let stream = This.RTCSession.getStream("slides", true)
-                This.RTCSession.closeStream(stream);
-                This.stopShareScreen({
-                    type: 'slides',
-                    callback: data.callback
-                })
+                stopShareScreen()
             }
 
             This.RTCSession.setStream(stream, type, true)
@@ -426,13 +420,8 @@ GsRTC.prototype.switchScreenSource = function(data) {
         if(event.stream){
             let stream = event.stream
             stream.oninactive = function () {
-                log.warn("user clicks the bottom share bar to stop sharing")
-                let stream = This.RTCSession.getStream("slides", true)
-                This.RTCSession.closeStream(stream);
-                This.stopShareScreen({
-                    type: 'slides',
-                    callback: data.callback
-                })
+                log.warn("user clicks the bottom share bar to stop sharing.")
+                stopShareScreen()
             }
 
             if(previousStream && This.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
@@ -483,26 +472,6 @@ GsRTC.prototype.stopShareScreen = function(data) {
         this.RTCSession.closeStream(stream)
         this.RTCSession.setStream(null, type, true)
         this.RTCSession.doOffer(pc)
-    }
-}
-
-/**
- * 暂停桌面演示
- * @param data
- */
-GsRTC.prototype.pauseScreenSource = function(data) {
-    log.info("carry out pause stream")
-    if (!this.RTCSession) {
-        log.error('pauseScreenSource: invalid RTCSession parameters! ')
-        return
-    }
-    let type = 'slides'
-    let stream = this.RTCSession.getStream(type, true)
-    if (stream) {
-        this.action = 'pauseScreenSource'
-        log.info('pause previous stream')
-        this.RTCSession.streamMuteSwitch({type: 'audio', stream: stream,})
-        data.callback({codeType: 200})
     }
 }
 

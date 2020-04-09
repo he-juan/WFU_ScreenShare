@@ -78,13 +78,14 @@ function shareScreen(callback){
         log.warn("please call first")
         return
     }
+
     window.isPresentShare = true
     let constraints = {
         audio: false,
         video: {
-            width: {max: 1920,},
-            height: {max: 1080,},
-            frameRate: {max: 30,}
+            width: {ideal: 1920,},
+            height: {ideal: 1080,},
+            frameRate: {ideal: 15,}
         }
     };
 
@@ -102,8 +103,7 @@ function shareScreen(callback){
  * @param isMute：true 暂停，false 取消暂停
  * @param callback
  */
-function pauseScreen(isMute, callback){
-    console.warn("isMuteStream:",isMute)
+function pauseScreenSwitch(isMute, callback){
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -113,12 +113,11 @@ function pauseScreen(isMute, callback){
         return
     }
 
-    let data = {
-        slides: 'slides',
-        callback: callback
-    }
-    gsRTC.muteStream = isMute
-    gsRTC.pauseScreenSource(data)
+    let type = 'slides'
+    let stream = gsRTC.RTCSession.getStream(type, true)
+    log.info('pause present stream')
+    gsRTC.RTCSession.streamMuteSwitch({type: type, stream: stream, mute: isMute})
+    callback({codeType: 200})
 }
 
 /**
@@ -136,12 +135,14 @@ function stopShareScreen(callback){
         return
     }
 
-    window.isPresentShare = 'stop'
-    let data = {
-        type: 'slides',
-        callback: callback
+    let stream = gsRTC.RTCSession.getStream("slides", true)
+    gsRTC.RTCSession.closeStream(stream);
+    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: 0})
+    gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
+
+    if(callback){
+        callback()
     }
-    gsRTC.stopShareScreen(data)
 }
 
 /**
@@ -157,17 +158,13 @@ function hangup() {
         return
     }
 
-    let reqId = parseInt(Math.round(Math.random()*100));
-    let message = {
-        destroyMediaSession: {
-            userName: "wfu_test",
-            reqId: reqId
-        }
+    if(!gsRTC.sokect){
+        log.warn("socket is not exist")
+        return
     }
 
-    gsRTC.sokect.ws.send(JSON.stringify(message))
-    log.info('end ws send: ' + JSON.stringify(message, null, '    '))
-    gsRTC.hangup()
+    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.BYE})
+    gsRTC.closePeerConn()
     gsRTC.sokect.ws.close()
 }
 

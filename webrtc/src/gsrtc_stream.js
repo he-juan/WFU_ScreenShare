@@ -46,17 +46,36 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     let prefix = isLocal === true ? 'local' : 'remote'
     let identify = null
 
-    // 不支持addTransceiver的浏览器无法判断收到的流的类型，只能判断是audio还是video
-    if(stream.getAudioTracks().length > 0){
-        identify = prefix + 'Audio'
-    }else if(stream.getVideoTracks().length > 0){
-        if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
+    let isVideo = !(type === 'audio')
+    switch (type) {
+        case 'audio':
+            identify = prefix + 'Audio'
+            break;
+        case 'main':
             identify = prefix + 'Video'
-        }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
+            break;
+        case 'slides':
             identify = prefix + 'PresentVideo'
-        }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
+            break;
+        case 'localVideoShare':
             identify = prefix + 'VideoShare'
-        }
+            break
+        case 'multiStreamPeer':
+            // 不支持addTransceiver的浏览器无法判断收到的流的类型，只能判断是audio还是video
+            if(stream.getAudioTracks().length > 0){
+                identify = prefix + 'Audio'
+            }else if(stream.getVideoTracks().length > 0){
+                if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
+                    identify = prefix + 'Video'
+                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
+                    identify = prefix + 'PresentVideo'
+                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
+                    identify = prefix + 'VideoShare'
+                }
+            }
+            break
+        default:
+            break;
     }
 
     // Fires when video metadata loading is complete (displays the current video resolution)
@@ -72,8 +91,10 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     if (target) {
         target.srcObject = stream;
         log.info('Get ' + identify +' stream');
-        log.info('set video _dimensions')
-        target.onloadedmetadata = displayVideoDimensions
+        if(isVideo){
+            log.info('set video _dimensions')
+            target.onloadedmetadata = displayVideoDimensions
+        }
     }
 }
 

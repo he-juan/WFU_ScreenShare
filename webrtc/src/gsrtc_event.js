@@ -25,7 +25,12 @@ GsRTC.prototype.eventStack = function(event){
                 let sdp = this.RTCSession.decorateLocalSDP()
                 // Save the session version, plus one for each re-invite
                 this.saveSDPSessionVersion(sdp)
-                this.sokect.sendMessage(sdp)
+
+                let data = {
+                    type: gsRTC.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
+                    sdp: sdp
+                }
+                this.sokect.sendMessage(data)
             }else {
                 log.info('exist invite in processing..')
             }

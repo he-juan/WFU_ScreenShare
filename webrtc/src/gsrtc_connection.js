@@ -125,6 +125,8 @@ GsRTC.prototype.decorateMultiStreamSDP  = function(subSDP) {
     mainSdp = mainSdp.replace(/c=IN IP6/g, "c=IN IP4 0.0.0.0")
     slidesSdp = slidesSdp.replace(/c=IN IP6/g, "c=IN IP4 0.0.0.0")
 
+    slidesSdp = gsRTC.setMaxBitrate(slidesSdp, 'video', 4096)
+    slidesSdp = gsRTC.setXgoogleBitrate(slidesSdp, 4096)
 
     function deleteHead(sdp) {
         let lines = sdp.split('\n')
@@ -155,22 +157,9 @@ PeerConnection.prototype.handleRemoteSDP  = function(sdp){
         log.error("commonDecorateRo: Invalid Argument");
         return;
     }
-    log.info('commonDecorateRo:\n' , sdp)
-
-    if (window.isPresentShare) {
-        let positions = [];
-        let pos = sdp.indexOf("m=video");
-        while (pos > -1) {
-            positions.push(pos);
-            pos = sdp.indexOf("m=video", pos + 1);
-        }
-        let slidesSdp = sdp.slice(positions[1], sdp.length)
-        let maxBitRate = 2048
-        slidesSdp = gsRTC.setMaxBitrate(slidesSdp, 'video', maxBitRate)
-        slidesSdp = gsRTC.setXgoogleBitrate(slidesSdp, maxBitRate)
-        slidesSdp = gsRTC.removeREMBField(slidesSdp)
-        sdp = sdp.slice(0, positions[1]) + slidesSdp
-    }
+    // TODO: gs_phone 不支持x-googel私有字段，web 端添加
+    sdp = gsRTC.setXgoogleBitrate(sdp, 4096)
+    log.info('commonDecorateRo:\n'  + sdp)
 
     This.setRemote(sdp)
     gsRTC.isSendReInvite = true

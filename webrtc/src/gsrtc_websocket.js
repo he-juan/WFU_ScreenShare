@@ -53,19 +53,16 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
     }
 
     ws.onmessage = function (event) {
-        log.warn('onmessage: ', event.data)
         This.handleIncomingMessage(event.data)
     }
 
     ws.onclose = function (event) {
         log.info('websocket onclose')
-        log.error(event)
         This.isChannelOpen = false
     }
 
     ws.onerror = function (event) {
         log.info('websocket onerror')
-        console.warn(event)
     }
 
     return ws
@@ -76,9 +73,56 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
  * @param data
  */
 WebSocketInstance.prototype.handleIncomingMessage = function(data){
+    log.info('handleIncomingMessage')
     let dataType = Object.prototype.toString.call(data)
     let parseDate = JSON.parse(data)
-    window.parseDate = parseDate
+
+    // let signalType = data.type
+    // switch (signalType) {
+    //     case gsRTC.SIGNAL_EVENT_TYPE.INVITE:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.PRESENT:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET:
+    //
+    //         break;
+    //
+    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO:
+    //
+    //         break;
+    //
+    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET:
+    //
+    //         break;
+    //     case gsRTC.SIGNAL_EVENT_TYPE.BYE:
+    //
+    //         break;
+    //
+    //     case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET:
+    //
+    //         break;
+    //     default:
+    //         break
+    // }
+
+
     switch (dataType) {
         case '[object String]':
             Object.keys(parseDate).forEach(function(action) {
@@ -105,30 +149,92 @@ WebSocketInstance.prototype.handleIncomingMessage = function(data){
 
 /**
  * send message
- * @param message
+ * @param data
  */
-WebSocketInstance.prototype.sendMessage = function (message) {
-    try {
-        if(!this.ws){
-            log.warn('websocket has not been created yet to send message')
-            return
-        }
-        let reqId = parseInt(Math.round(Math.random()*100));
-        let content = {
-            userName: "wfu_test",
-            reqId: reqId,
-            sdp: {
-                length: message.length,
-                data: message,
-            }
-        }
-
-        let data = gsRTC.isSendReInvite ? {updateMediaSession: content} : {createMediaSession: content}
-        log.warn("ws send message: " , data);
-        this.ws.send(JSON.stringify(data))
-    }catch (e) {
-        console.error(e)
-        log.error(e)
+WebSocketInstance.prototype.sendMessage = function (data) {
+    if(!this.ws){
+        log.warn('websocket has not been created yet to send message')
+        return
     }
+
+    let reqId = parseInt(Math.round(Math.random()*100));
+    let message
+    let signalType = data.type
+
+    switch (signalType) {
+        case gsRTC.SIGNAL_EVENT_TYPE.INVITE:
+            message = {
+                createMediaSession: {
+                    userName: "webRTC_Client",
+                    reqId: reqId,
+                    sdp: {
+                        length: data.sdp.length,
+                        data: data.sdp,
+                    }
+                }
+            }
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE:
+            message = {
+                updateMediaSession: {
+                    userName: "webRTC_Client",
+                    reqId: reqId,
+                    sdp: {
+                        length: data.sdp.length,
+                        data: data.sdp,
+                    }
+                }
+            }
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT:
+            message = {
+                ctrlPresentation: {
+                    userName: "webRTC_Client",
+                    reqId: reqId,
+                    sendPermission: data.permission,
+                }
+            }
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET:
+
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE:
+
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET:
+
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO:
+
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET:
+
+            break;
+
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO:
+
+            break;
+
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET:
+
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.BYE:
+            message = {
+                destroyMediaSession: {
+                    userName: "webRTC_Client",
+                    reqId: reqId
+                }
+            }
+            break;
+
+        case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET:
+
+            break;
+        default:
+            break
+    }
+
+    log.warn("ws send message ");
+    this.ws.send(JSON.stringify(message))
 }
 

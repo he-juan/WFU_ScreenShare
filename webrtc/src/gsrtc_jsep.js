@@ -325,25 +325,15 @@ PeerConnection.prototype.setRemoteDescriptionSuccess = function (pc) {
     this.gsRTC.inviteProcessing = false
 
     let sendPermission
-    if(window.isPresentShare === true  || window.isMainShare === true){
-        sendPermission = 1
-    }else if(window.isPresentShare === 'stop' || window.isMainShare === 'stop'){
-        sendPermission = 0
-    }
-
-    let reqId = parseInt(Math.round(Math.random() * 100));
-    let digital = {
-        ctrlPresentation: {
-            userName: "wfu_test",
-            reqId: reqId,
-            sendPermission: sendPermission,
+    if(window.isPresentShare || window.isMainShare){
+        if(window.isPresentShare === true || window.isMainShare === true){
+            sendPermission = 1
+        }else if(window.isPresentShare === 'stop' || window.isMainShare === 'stop'){
+            sendPermission = 0
         }
+        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: sendPermission})
     }
-    log.info("send ctrlPresentation: \n" + JSON.stringify(digital, null, '    '));
 
-    if (gsRTC && gsRTC.sokect) {
-        gsRTC.sokect.ws.send(JSON.stringify(digital))
-    }
     window.isMainShare = false
     window.isPresentShare = false
 }

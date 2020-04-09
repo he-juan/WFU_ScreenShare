@@ -1,6 +1,3 @@
-let ws
-let wsAddr = localStorage.getItem('wsName');
-let pausePresentBtn = document.getElementById("pausePresent");
 
 window.onload = function () {
     let wsName = localStorage.getItem('wsName')
@@ -35,6 +32,8 @@ window.onload = function () {
         },
         500);
 }
+
+let pausePresentBtn = document.getElementById("pausePresent");
 
 function multiStreamCall(){
     log.warn("multi stream call ...")
@@ -112,6 +111,6 @@ function presentPauseOperation(){
         }
 
     }
-    pauseScreen(window.onpausePresent, callback)
+    pauseScreenSwitch(window.onpausePresent, callback)
 }
 
