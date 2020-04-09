@@ -918,7 +918,7 @@
                 }else if(error.name === "NotReadableError" || error.name === "TrackStartError"){
                     // webcam or mic are already in use
                     log.warn('webcam or mic are already in use')
-                }else if(error.name === "NotAllowedError" || error.name === "PermissionDeniedError" || error.name === "PermissionDismissedError"){
+                }else if(error.name === "NotAllowedError" || error.name === "PermissionDeniedError" || error.name === "PermissionDismissedError" ){
                     // permission denied in browser
                     log.warn('permission denied in browser')
                 }else if(error.name === "TypeError"){
@@ -955,9 +955,7 @@
             } else {
                 log.info('getDisplayMedia is not supported by current browser')
                 // 使用插件共享桌面
-                window.getScreenId('all', function(error, sourceId, screen_constraints) {
-                    navigator.getUserMedia(screen_constraints, onGetStreamSuccess, onGetStreamFailed)
-                });
+                alert("当前浏览器不支持桌面共享")
             }
         }
     }
@@ -1216,22 +1214,6 @@
                 log.warn("This version of Edge does not support screen capture feature");
                 return;
             }
-        }
-
-        /***
-         * For IE / Safari which is installed webrtc-everywhere
-         */
-        if ((adapter.browserDetails.browser === "ie" || adapter.browserDetails.browser === "safari") && adapter.browserDetails.isWebRTCPluginInstalled === true) {
-            screenConstraints = {
-                audio: false,
-                video: {
-                    optional: [{sourceId: "X978GrandstreamScreenCapturer785"}],
-                    mandatory: {
-                        minFrameRate: 1,
-                        maxFrameRate: 5
-                    }
-                }
-            };
         }
 
         return screenConstraints

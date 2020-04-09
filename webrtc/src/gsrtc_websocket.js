@@ -1,12 +1,4 @@
 /*Log Debug Start*/
-/**
- * @param {Function} debug The function that handles the DEBUG level logs.
- * @param {Function} log The function that handles the LOG level logs.
- * @param {Function} info The function that handles the INFO level logs.
- * @param {Function} warn The function that handles the WARN level logs.
- * @param {Function} error The function that handles the ERROR level logs.
- * @type {{warn: *, debug: *, log: *, error: *, info: *}}
- */
 var log = {
     debug: window.debug("WebSocket:DEBUG"),
     log: window.debug("WebSocket:LOG"),
@@ -61,29 +53,13 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
     }
 
     ws.onmessage = function (event) {
-        // if (typeof (event.data) === 'string') {
-        //     jsSipParser(event.data, 0)
-        // }
-
-        // for wfu
-        if (isJsonString(event.data)) {
-            let parseDate = JSON.parse(event.data)
-            console.warn("************ onmessage parseDate: ", parseDate)
-            if (parseDate.createMediaSessionRet && parseDate.createMediaSessionRet.sdp && parseDate.createMediaSessionRet.sdp.data) {
-                role = ''
-                let sdp  = parseDate.createMediaSessionRet.sdp.data
-                console.warn('get createMediaSessionRet sdp: \n', sdp)
-                gsRTC.RTCSession.commonDecorateRo(sdp)
-            }
-        } else {
-            let type = typeJudgement(event.data)
-            console.warn("event.data type: ", type)
-        }
+        log.warn('onmessage: ', event.data)
+        This.handleIncomingMessage(event.data)
     }
 
     ws.onclose = function (event) {
         log.info('websocket onclose')
-        console.warn(event)
+        log.error(event)
         This.isChannelOpen = false
     }
 
@@ -95,6 +71,37 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
     return ws
 }
 
+/**
+ * 处理收到的 webSocket消息
+ * @param data
+ */
+WebSocketInstance.prototype.handleIncomingMessage = function(data){
+    let dataType = Object.prototype.toString.call(data)
+    let parseDate = JSON.parse(data)
+    window.parseDate = parseDate
+    switch (dataType) {
+        case '[object String]':
+            Object.keys(parseDate).forEach(function(action) {
+                let code = parseDate[action].errorInfo.errorId
+                if(gsRTC.isNxx(2, code)){
+                    if(parseDate[action].sdp) {
+                        let sdp = parseDate[action].sdp.data
+                        gsRTC.RTCSession.handleRemoteSDP(sdp)
+                    }
+                }else if(gsRTC.isNxx(4, code)){
+                    log.warn('receive 4xx: ' + code)
+                }
+
+                gsRTC.trigger(gsRTC.action, {codeType: code});
+                gsRTC.off(gsRTC.action)     // 事件监听完成后，删除该回调事件
+                gsRTC.action = null
+            });
+            break
+        default:
+            log.warn("event.data type: ", dataType)
+            break
+    }
+}
 
 /**
  * send message
@@ -106,26 +113,19 @@ WebSocketInstance.prototype.sendMessage = function (message) {
             log.warn('websocket has not been created yet to send message')
             return
         }
-
-        // for wfu
-        if(window.wfu === true){
-            let reqId = parseInt(Math.round(Math.random()*100));
-            console.warn("random req id is" + reqId);
-            let data = {
-                createMediaSession: {
-                    userName: "wfu_test",
-                    reqId: reqId,
-                    sdp: {
-                        length: message.length,
-                        data: message,
-                    }
-                }
+        let reqId = parseInt(Math.round(Math.random()*100));
+        let content = {
+            userName: "wfu_test",
+            reqId: reqId,
+            sdp: {
+                length: message.length,
+                data: message,
             }
-            log.warn("ws send message: " , data);
-            this.ws.send(JSON.stringify(data))
-        }else {
-            this.ws.send(message)
         }
+
+        let data = gsRTC.isSendReInvite ? {updateMediaSession: content} : {createMediaSession: content}
+        log.warn("ws send message: " , data);
+        this.ws.send(JSON.stringify(data))
     }catch (e) {
         console.error(e)
         log.error(e)

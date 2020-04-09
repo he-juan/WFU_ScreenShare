@@ -1,3 +1,11 @@
+var log = {};
+log.debug = window.debug("GSRTC_COMMON:DEBUG");
+log.log = window.debug("GSRTC_COMMON:LOG");
+log.info = window.debug("GSRTC_COMMON:INFO");
+log.warn = window.debug("GSRTC_COMMON:WARN");
+log.error = window.debug("GSRTC_COMMON:ERROR");
+/*Log Debug End*/
+
 /**
  * Function that subscribes a listener to an event.
  * @method on
@@ -11,6 +19,7 @@ GsRTC.prototype.on = function(eventName, callback) {
     } else {
         throw 'Provided parameter is not a function'
     }
+
 };
 
 /**
@@ -39,6 +48,7 @@ GsRTC.prototype.off = function(eventName, callback) {
             }
         }
     }
+
 };
 
 /**
@@ -411,10 +421,27 @@ GsRTC.prototype.tskStringIsNullOrEmpty = function (str) {
 }
 
 /**
- * is string or not
- * @param str
- * @returns {boolean}
+ * 获取屏幕分辨率
+ * @returns {string}
  */
-GsRTC.prototype.tskStringIsString = function(str) {
-    return (str instanceof String || typeof str == "string");
+GsRTC.prototype.getScreenResolution = function() {
+    if (window.devicePixelRatio === undefined) {
+        window.devicePixelRatio = 1;
+    }
+    let screenResolution = window.screen.height * window.devicePixelRatio * window.screen.width * window.devicePixelRatio
+    let InitResolution = {};
+    //根据用户屏幕分辨率确定入会初始分辨率
+    if (screenResolution <= 1440 * 900) {
+        InitResolution = {
+            width: 1280,
+            height: 720
+        }
+    } else {
+        InitResolution = {
+            width: 1920,
+            height: 1080
+        }
+    }
+    log.info("screen resolution = " + window.screen.height * window.devicePixelRatio + " * " + window.screen.width * window.devicePixelRatio);
+    return InitResolution;
 }

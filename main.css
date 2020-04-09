@@ -1,0 +1,59 @@
+body{
+    background-image: linear-gradient(to right, #46d3e5 , #7abab6);
+}
+.video-setting audio,video{
+    border: 1px solid #b95050;
+    width: 300px;
+    height: 225px;
+}
+input {
+    height: 40px;
+    background: brown;
+    color: aliceblue;
+    font-size: 15px;
+    width: 200px;
+}
+.btn-default{
+    width: 150px;
+    height: 40px;
+    background-color: #cf5248;
+    color: white;
+    margin: 8px 5px;
+    padding: 3px;
+    border: 0;
+    border-radius: 8px;
+    transition: all 200ms;
+    min-width: 150px;
+    font-size: medium;
+}
+.device-mask{
+    height: 35px;
+    display: inline-block;
+    text-align: center;
+    border-radius: 5px;
+    margin: 20px;
+    transition: all 200ms;
+    position: relative;
+}
+.deviceSelect{
+    border-radius: 5px;
+    height: 40px;
+    background: #c8d6d5;
+    width: 300px;
+    color: #1a0101;
+    font-family: cursive;
+}
+.video-tag, .audio-tag{
+    color: #031b3e;
+    font-family: fantasy;
+}
+select:focus{
+    border: 2px #ddd solid;
+    box-shadow: 0 0 15px 1px #DDDDDD;
+}
+.form-control{
+    background: white;
+    color: black;
+    width:230px;
+    display:inline
+}

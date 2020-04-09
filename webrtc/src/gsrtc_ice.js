@@ -69,12 +69,6 @@ PeerConnection.prototype.iceConnectFailed = function(pc){
     }else {
         log.info('Prepare start do ice restart！')
         pc.isIceFailed = true
-        this.gsRTC.sendInviteQueue.push({
-            action: 'iceRestart',
-            sdp: null,
-            type: pc.type
-        })
-
         this.doOffer(pc)
         pc.iceFailureNum ++
     }
@@ -90,7 +84,6 @@ PeerConnection.prototype.onIceRestartFailed = function (pc) {
     log.error("ice restart failed")
     pc.iceFailureNum = 0
     pc.isIceFailed = true
-    this.gsRTC.sipStack.jsSipSendBye()
     log.info('close peer')
     for (let key in this.RTCSession.peerConnections) {
         let pc = this.RTCSession.peerConnections[key];
@@ -110,7 +103,7 @@ PeerConnection.prototype.onIceCandidate = function (pc, event) {
         pc.isLocalSdpPending = false
         this.onIceGatheringCompleted();
     }else {
-        log.info(`${ pc.type } ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+        log.info(`ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
     }
 }
 
@@ -119,17 +112,13 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
         return
     }
 
-    if(this.peerConnections){
-        for (let key in this.peerConnections){
-            let pc = this.peerConnections[key]
-            if(pc.isLocalSdpPending === true){
-                log.info('MyOnIceGatheringCompleted not ready( ' + pc.type + " )")
-                return false;
-            }
-        }
+    let pc = gsRTC.RTCSession.peerConnections['multiStreamPeer']
+    if(pc.isLocalSdpPending === true){
+        log.info('MyOnIceGatheringCompleted not ready( ' + pc.type + " )")
+        return false;
     }
-
     log.warn("__MyOnIceGatheringCompleted be ready to send INVITE or 200OK");
+
     this.gsRTC.isProcessingInvite = false
     this.gsRTC.eventStack({type: 'GET_LO_SUCCESS'})
 }

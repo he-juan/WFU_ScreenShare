@@ -29,7 +29,7 @@ GsRTC.prototype.getSdpByType = function (type, sdp) {
             } else if ((type === 'main' || type === 'video1') && sdpArray[i].indexOf('a=content:main') >= 0) {
                 result = sdpArray[i]
                 mid = This.MID_OBJ.MAIN_MID.ORIGINAL_MID
-            } else if (type === 'slides' && sdpArray[i].indexOf('a=content:slides') >= 0) {
+            } else if( (type === 'slides') && sdpArray[i].indexOf('a=content:slides') >= 0) {
                 mid = This.MID_OBJ.SLIDES_MID.ORIGINAL_MID
                 result = sdpArray[i]
             }
@@ -41,7 +41,6 @@ GsRTC.prototype.getSdpByType = function (type, sdp) {
             }
         }
     }
-
     return result
 }
 

@@ -312,6 +312,198 @@ GsRTC.prototype.setVp8ResolutionOfSdp = function(sdp, width, height){
 }
 
 /**
+ *  Use the standard b=AS:BITRATE (Chrome) or b=TIAS:BITRATE (Firefox) attributes in the SDP for the audio or video channel
+ * @param sdp
+ * @param media
+ * @param ASBitrate
+ * @returns {*}
+ */
+GsRTC.prototype.setMaxBitrate = function(sdp, media, ASBitrate) {
+    ASBitrate = ASBitrate ? ASBitrate : localStorage.getItem('maxBitRate') ? localStorage.getItem('maxBitRate') : ''
+    if(!ASBitrate){
+        log.warn('No bitrate has been set')
+        return sdp
+    }
+
+    // find m line place
+    var line = sdp.indexOf('m=' + media)
+    if(line === -1){
+        log.warn('Could not find the m line for ' + media)
+        return sdp
+    }
+    log.info('Find the m line for ' + media + ' at line ' + line)
+
+    // add a new b line
+    function addNewLine(_sdp, type, bitrate) {
+        var lines = _sdp.split("\n")
+        var mline = -1
+
+        // find m line place
+        for(var i = 0; i<lines.length; i++){
+            if(lines[i].indexOf('m=' + media) >= 0){
+                mline = i
+                break
+            }
+        }
+
+        // pass the m line
+        mline++
+
+        // Ship i and c lines
+        while (lines[mline].indexOf('i=') >= 0 || lines[mline].indexOf('c=') >= 0){
+            log.info(' Ship i and c lines')
+            mline++
+        }
+
+        // add a new b=AS or b=TIAS line
+        // log.warn('Adding new b line before line ' + mline)
+        var newLines = lines.slice(0, mline)
+        newLines.push('b=' + type + ':' + bitrate)
+        newLines = newLines.concat(lines.slice(mline, lines.length))
+
+        return newLines.join('\n')
+    }
+
+    var replacement
+    if(sdp.indexOf('b=AS') >= 0){
+        log.warn('Replaced b=AS line at line '+ line)
+        replacement = "b=AS:" + ASBitrate
+        sdp = sdp.replace(/b=AS:([a-zA-Z0-9]{3,4})/, replacement);
+    }else {
+        sdp = addNewLine(sdp, 'AS', ASBitrate)
+    }
+
+    var TIASBitrate = ASBitrate * 1000
+    if(sdp.indexOf('b=TIAS') >= 0){
+        log.warn('Replaced b=TIAS line at line '+ line)
+        replacement = "b=TIAS:" + TIASBitrate
+        sdp = sdp.replace(/b=TIAS:([a-zA-Z0-9]{6,7})/, replacement);
+
+    }else {
+        sdp = addNewLine(sdp, 'TIAS', TIASBitrate)
+    }
+
+    return sdp
+}
+
+/**
+ * set x-google-xxx-bitrate
+ * @param sdp
+ * @param bitrate
+ * @returns {string}
+ */
+GsRTC.prototype.setXgoogleBitrate = function(sdp, bitrate) {
+    var lines = sdp.split("\n")
+    var replacement
+
+    // get all pt number, except rtx\red\ulpfec
+    var ptArr = []
+    var validLine = RegExp.prototype.test.bind(/^([a-z])=(.*)/);
+    sdp.split(/(\r\n|\r|\n)/).filter(validLine).forEach(function(line) {
+        if(line.indexOf('a=rtpmap') >= 0 && line.indexOf('rtx') < 0 && line.indexOf('red') < 0 && line.indexOf('ulpfec') < 0){
+            var pt =line.split(" ")[0].split(":")[1]
+            ptArr.push(pt)
+        }
+    });
+
+
+    // add new a=fmtp line if rtpmap is not have a=fmtp line
+    for(var j = 0; j<ptArr.length; j++){
+        if(sdp.indexOf('a=fmtp:' + ptArr[j]) < 0){
+            for(var k = 0; k<lines.length; k++){
+                if(lines[k].indexOf('a=rtpmap:' + ptArr[j]) >= 0){
+                    // Skip a=rtpmap lines for encoding
+                    k++
+                    var newLines = lines.slice(0, k)
+                    newLines.push('a=fmtp:' + ptArr[j])
+                    lines = newLines.concat(lines.slice(k, lines.length))
+                }
+            }
+        }
+    }
+
+
+    // 考虑：a=fmtp:100 这种形式，添加时首个不要分号，要空格
+    // 有的PT没有x-google-min-bitrate=1024;x-google-start-bitrate=1536;x-google-max-bitrate=2048字段： 有则修改，没有则添加
+    for(var i = 0; i<lines.length; i++){
+        if(lines[i].indexOf('a=fmtp:') >= 0){
+            // filter rtx and ulpfec
+            if(lines[i].indexOf('apt=') >= 0 || lines[i].indexOf('ulpfec') >= 0){
+                continue
+            }
+
+            // filter a=fmtp:100 format
+            lines[i] = lines[i].trim()
+            if(lines[i].split(' ').length === 1){
+                replacement = " x-google-min-bitrate=" + bitrate + ";x-google-start-bitrate=" + bitrate + ";x-google-max-bitrate=" + bitrate
+                lines[i] = lines[i] + replacement
+            }else {
+                if(lines[i].indexOf('x-google-min-bitrate') >= 0){
+                    replacement = "x-google-min-bitrate=" + bitrate
+                    lines[i] = lines[i].replace(/x-google-min-bitrate=([a-zA-Z0-9]{1,8})/, replacement);
+                }else {
+                    replacement = ";x-google-min-bitrate=" + bitrate
+                    lines[i] = lines[i] + replacement
+                }
+
+                if(lines[i].indexOf('x-google-start-bitrate') >= 0){
+                    replacement = "x-google-start-bitrate=" + bitrate
+                    lines[i] = lines[i].replace(/x-google-start-bitrate=([a-zA-Z0-9]{1,8})/, replacement);
+                }else {
+                    replacement = ";x-google-start-bitrate=" + bitrate
+                    lines[i] = lines[i] + replacement
+                }
+
+                if(lines[i].indexOf('x-google-max-bitrate') >= 0){
+                    replacement = "x-google-max-bitrate=" + bitrate
+                    lines[i] = lines[i].replace(/x-google-max-bitrate=([a-zA-Z0-9]{1,8})/, replacement);
+                }else {
+                    replacement = ";x-google-max-bitrate=" + bitrate
+                    lines[i] = lines[i] + replacement
+                }
+            }
+        }
+    }
+
+    return lines.join('\n')
+}
+
+/**
+ * remove REMB Negotiation
+ * @param sdp
+ * @returns {string}
+ */
+GsRTC.prototype.removeREMBField = function(sdp){
+    var lines = sdp.split("\n")
+
+    for(var i = 0; i<lines.length; i++){
+        if (lines[i].indexOf('goog-remb') >= 0 || lines[i].indexOf('transport-cc') >= 0) {
+            log.info('remove goog-remb or transport-cc filed')
+            lines.splice(i, 1)
+            i--
+        }
+    }
+    return lines.join('\n')
+}
+
+/**
+ * 删除level-asymmetry-allowed
+ * @param sdp
+ * @returns {string}
+ */
+GsRTC.prototype.removeLevel = function(sdp){
+    var lines = sdp.split("\n")
+    for(var i = 0; i<lines.length; i++){
+        if (lines[i].indexOf('level-asymmetry-allowed') >= 0 ) {
+            log.info('remove level-asymmetry-allowed')
+            lines.splice(i, 1)
+            i--
+        }
+    }
+    return lines.join('\n')
+}
+
+/**
  * modified mid of sdp
  * @param sdp
  * @param mid
@@ -396,131 +588,5 @@ GsRTC.prototype.setResolutionOfSdp = function (sdp, width, height) {
     }catch (e) {
         log.error(e)
     }
-    return sdp
-}
-
-/**
- * Processing sdp when multistream
- * @param subSDP
- * @returns {string}
- */
-GsRTC.prototype.decorateMultiStreamSdp  = function(subSDP) {
-    let This = this
-    var sdp
-    let sdpArray = []
-    let lines = subSDP.split('\n')
-
-    // modified BUNDLE and content
-    for(let i = 0; i<lines.length; i++){
-        if(lines[i].indexOf('a=group:BUNDLE') >= 0){
-            lines.splice(i, 2, "a=msid-semantic: WMS\na=msid-semantic: WMS\na=msid-semantic: WMS\na=group:BUNDLE 0\na=group:BUNDLE 1\na=group:BUNDLE 2");
-        }
-        if(lines[i].indexOf('a=mid:1') >= 0){
-            lines.splice(i+1, 0, "a=content:main");
-            i++
-        }
-        if(lines[i].indexOf('a=mid:2') >= 0){
-            lines.splice(i+1, 0, "a=content:slides");
-            i++
-        }
-    }
-
-    // get all media line
-    function getPositions(arr){
-        // get all media line
-        let pos = []
-        for(let i = 0; i<arr.length; i++){
-            if(arr[i].indexOf('m=') >= 0){
-                pos.push(i)
-            }
-        }
-        return pos
-    }
-    let positions = getPositions(lines)
-
-    let target
-    let index = 0
-    // get audio main slides sdp array
-    if(positions.length > 0){
-        for(let j = 0; j <= positions.length; j++){
-            if(j === positions.length){
-                target = lines.slice(positions[index], lines.length).join('\n')
-            }else {
-                target = lines.slice(positions[j-1], positions[j]).join('\n')
-            }
-            sdpArray.push(target)
-            index = j
-        }
-    }
-
-    sdpArray[0] = sdpArray[0].concat(['\n'])
-    let audioSdp = sdpArray[0].concat(sdpArray[1])
-    let mainSdp = sdpArray[0].concat(sdpArray[2])
-    let slidesSdp = sdpArray[0].concat(sdpArray[3])
-
-    // delete useless PT number for main
-    let mainSdp_ = SDPTools.parseSDP(mainSdp)
-    SDPTools.removeCodecByPayload(mainSdp_, 0, [98, 99,127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116])
-    // set resolution of sdp
-    let resolution = This.getVideoResolution('EXPECT_RECV_RESOLUTION')
-    if(resolution.width && resolution.height){
-        // set expected receive resolution
-        mainSdp_ = This.setResolutionOfSdp(mainSdp_, resolution.width, resolution.height)
-    }
-    mainSdp = SDPTools.writeSDP(mainSdp_)
-    // delete useless PT number for slides
-    let slidesSdp_ = SDPTools.parseSDP(slidesSdp)
-    SDPTools.removeCodecByPayload(slidesSdp_, 0, [98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116])
-    slidesSdp = SDPTools.writeSDP(slidesSdp_)
-
-    // delete ssrc if no stream to send
-    function removeSSRC(sdp){
-        let sdpArray = sdp.split('\n');
-        for(let k = 0; k<sdpArray.length; k++){
-            if(sdpArray[k].indexOf('a=ssrc-group:') >= 0 || sdpArray[k].indexOf('a=ssrc') >= 0 || sdpArray[k].indexOf('a=msid:-') >= 0){
-                sdpArray.splice(k, 1)
-                k--
-            }
-        }
-        return sdpArray.join('\n')
-    }
-
-    // modified direction for three media
-    let audioStream = This.RTCSession.getStream('audio', true)
-    if(!audioStream){
-        audioSdp = audioSdp.replace(/a=sendrecv/g, "a=recvonly")
-        audioSdp = removeSSRC(audioSdp)
-    }
-    let mainStream = This.RTCSession.getStream('main', true)
-    if(!mainStream){
-        mainSdp = mainSdp.replace(/a=sendrecv/g, "a=recvonly")
-        mainSdp = removeSSRC(mainSdp)
-    }
-    // set direction recvonly if not share screen
-    let stream = This.RTCSession.getStream('slides', true)
-    if(stream){
-        slidesSdp = slidesSdp.replace(/a=sendrecv/g, "a=sendonly");
-        slidesSdp = slidesSdp.replace(/a=recvonly/g, "a=sendonly");
-    }else {
-        slidesSdp = slidesSdp.replace(/a=sendrecv/g, "a=recvonly");
-        slidesSdp = removeSSRC(slidesSdp)
-    }
-
-    function deleteHead(sdp) {
-        let lines = sdp.split('\n')
-        for(var k = 0; k<lines.length; k++){
-            if(lines[k].indexOf('m=') >= 0){
-                sdpArray[0] = lines.slice(0, k)
-                sdp = lines.slice(k, lines.length).join('\n')
-            }
-        }
-        return sdp
-    }
-
-    audioSdp = deleteHead(audioSdp)
-    mainSdp = deleteHead(mainSdp)
-    slidesSdp = deleteHead(slidesSdp)
-    let head =  sdpArray[0].join('\n')
-    sdp = head + '\n' + audioSdp + '\n'+ mainSdp + slidesSdp
     return sdp
 }

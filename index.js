@@ -1,102 +1,6 @@
-window.wfu = true
 let ws
 let wsAddr = localStorage.getItem('wsName');
-
-function addWebSocket() {
-    let wsAddr =  document.getElementById('wsAddr').value
-    let protocols = 'gs-webrtc-json';
-    if(!wsAddr){
-        alert('enter ws value !')
-        return
-    }
-
-    localStorage.setItem('wsName',wsAddr)
-
-    let sipCallInfo = {
-        sessionsConfig: ['audio', 'main', 'slides']
-    };
-    let sipRegisterInfo = {
-        protocol: protocols,
-        websocketUrl: wsAddr,
-    }
-    gsRTC.conf.sessionsConfig = sipCallInfo.sessionsConfig
-    gsRTC.sokect = new WebSocketInstance(sipRegisterInfo.websocketUrl, sipRegisterInfo.protocol || 'sip')
-    gsRTC.RTCSession = new PeerConnection(sipCallInfo, window.gsRTC)
-    gsRTC.RTCSession.createRTCSession(gsRTC.conf)
-}
-
-function hangup() {
-    console.log('Ending call');
-    let message;
-    let reqId = parseInt(Math.round(Math.random()*100));
-    console.warn("random req id is" + reqId);
-
-    console.log(ws);
-    message = {
-        destroyMediaSession: {
-            userName: "wfu_test",
-            reqId: reqId
-        }
-    }
-
-    if(!gsRTC || !gsRTC.sokect || !gsRTC.sokect.ws){
-        console.warn('ws connected is not established')
-    }else {
-        gsRTC.sokect.ws.send(JSON.stringify(message))
-        console.warn('end ws send: ' + JSON.stringify(message, null, '    '))
-        console.log('close webSocket connection')
-        gsRTC.sokect.ws.close()
-        // window.location.reload(true)
-    }
-}
-
-
-function startPresent(operation) {
-    console.warn('start present!!')
-    let reqId = parseInt(Math.round(Math.random()*100));
-    console.warn("random req id is" + reqId);
-    let data = {
-        ctrlPresentation: {
-            userName: "wfu_test",
-            reqId: reqId,
-            sendPermission: operation,
-        }
-    }
-    console.warn("send data: \n" + JSON.stringify(data, null, '    ') );
-    if(gsRTC && gsRTC.sokect){
-        gsRTC.sokect.ws.send(JSON.stringify(data))
-    }
-}
-
-
-
-function getCaptureStream(type){
-    console.warn("getCaptureStream: ", type)
-    let canvas = document.getElementById('canvasForCaptureStream')
-    let stream = canvas.captureStream();
-
-    if(type === 'main'){
-        console.warn('添加主流')
-        let localVideo1 = document.getElementById('localVideo')
-        localVideo1.srcObject = stream;
-    }
-
-    return stream
-}
-
-function getSlidesCaptureStream(type){
-    console.warn("getSlidesCaptureStream: ", type)
-    let canvas = document.getElementById('slidesCanvas')
-
-    let stream = canvas.captureStream();
-    if(type === 'slides'){
-        console.warn('添加演示流')
-        let localPresent = document.getElementById('localPresentVideo')
-        localPresent.srcObject = stream;
-    }
-
-    return stream
-}
+let pausePresentBtn = document.getElementById("pausePresent");
 
 window.onload = function () {
     let wsName = localStorage.getItem('wsName')
@@ -131,3 +35,83 @@ window.onload = function () {
         },
         500);
 }
+
+function multiStreamCall(){
+    log.warn("multi stream call ...")
+    let wsAddr =  document.getElementById('wsAddr').value
+
+    if(!wsAddr){
+        alert('enter ws value !')
+        return
+    }
+
+    call(wsAddr, function (data) {
+        log.warn("join  meetings callback: ", data)
+    })
+}
+
+function videoOperation(operation){
+    if(operation){
+        window.isMainShare = true
+        let videoList = document.getElementById('videoList').options
+        let deviceId
+        if (videoList && videoList.length > 0) {
+            let selectDevice = videoList[videoList.selectedIndex]
+            log.warn("selectDevice: ", selectDevice.label)
+            deviceId = selectDevice.value
+        } else {
+            alert('No device here! plug device and Try again!')
+        }
+
+        let data = {
+            deviceId: deviceId,
+            type: 'video',
+            callback: function (data) {
+                log.info("video on callback:",data)
+            }
+        }
+        shareVideo(data)
+    }else{
+        window.isMaintShare = 'stop'
+
+        stopShareVideo(function (data) {
+            log.info("Video off callback：", data)
+        })
+    }
+}
+
+function startPresent(operation) {
+    if(operation){
+        window.isPresentShare = true
+        pausePresentBtn.hidden = false
+        shareScreen(function (data) {
+            log.info("开启演示callback：", data)
+        })
+    }else{
+        window.isPresentShare = 'stop'
+        pausePresentBtn.hidden = true
+        stopShareScreen(function (data) {
+            log.info("关闭演示callback：", data)
+        })
+    }
+}
+
+function presentPauseOperation(){
+    if(pausePresentBtn.innerHTML === "暂停演示"){
+        window.onpausePresent = true
+        pausePresentBtn.innerHTML = "恢复演示"
+    }else if(pausePresentBtn.innerHTML === "恢复演示"){
+        window.onpausePresent = false
+        pausePresentBtn.innerHTML = "暂停演示"
+    }
+    function callback(data){
+        if(pausePresentBtn.innerHTML === "暂停演示"){
+            log.info("恢复演示callback： ", data)
+        }else{
+            log.info("暂停演示callback： ", data)
+        }
+
+    }
+    pauseScreen(window.onpausePresent, callback)
+}
+

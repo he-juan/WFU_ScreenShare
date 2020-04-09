@@ -1,3 +1,12 @@
+/*Log Debug Start*/
+var log = {};
+log.debug = window.debug("GSRTC_STREAM:DEBUG");
+log.log = window.debug("GSRTC_STREAM:LOG");
+log.info = window.debug("GSRTC_STREAM:INFO");
+log.warn = window.debug("GSRTC_STREAM:WARN");
+log.error = window.debug("GSRTC_STREAM:ERROR");
+/*Log Debug End*/
+
 /***
  * Function that clear stream, free resources
  * @param stream
@@ -36,43 +45,25 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     log.info('get local/remote stream , ' + type)
     let prefix = isLocal === true ? 'local' : 'remote'
     let identify = null
-    let isVideo = !(type === 'audio')
-    switch (type) {
-        case 'audio':
-            identify = prefix + 'Audio'
-            break;
-        case 'main':
+
+    // 不支持addTransceiver的浏览器无法判断收到的流的类型，只能判断是audio还是video
+    if(stream.getAudioTracks().length > 0){
+        identify = prefix + 'Audio'
+    }else if(stream.getVideoTracks().length > 0){
+        if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
             identify = prefix + 'Video'
-            break;
-        case 'slides':
+        }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
             identify = prefix + 'PresentVideo'
-            break;
-        case 'localVideoShare':
+        }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
             identify = prefix + 'VideoShare'
-            break
-        case 'multiStreamPeer':
-            // 不支持addTransceiver的浏览器无法判断收到的流的类型，只能判断是audio还是video
-            if(stream.getAudioTracks().length > 0){
-                identify = prefix + 'Audio'
-            }else if(stream.getVideoTracks().length > 0){
-                if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
-                    identify = prefix + 'Video'
-                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
-                    identify = prefix + 'PresentVideo'
-                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
-                    identify = prefix + 'VideoShare'
-                }
-            }
-            break
-        default:
-            break;
+        }
     }
 
     // Fires when video metadata loading is complete (displays the current video resolution)
     function displayVideoDimensions(e) {
         let className = e.target.id + '_dimensions'
         let dimensions = document.getElementsByClassName(className);
-        if(dimensions && dimensions[0]){
+        if(dimensions && dimensions[0] && e.target.videoWidth){
             dimensions[0].innerHTML = e.target.videoWidth + ' x ' + e.target.videoHeight
         }
     }
@@ -81,18 +72,8 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     if (target) {
         target.srcObject = stream;
         log.info('Get ' + identify +' stream');
-        // 会覆盖演示流的oninactive监听事件
-        // if(stream){
-        //     stream.oninactive = function () {
-        //         log.info('stream oninactive, clear element source')
-        //         target.srcObject = null
-        //     }
-        // }
-        
-        if(isVideo){
-            log.info('set video _dimensions')
-            target.onloadedmetadata = displayVideoDimensions
-        }
+        log.info('set video _dimensions')
+        target.onloadedmetadata = displayVideoDimensions
     }
 }
 
@@ -146,16 +127,29 @@ PeerConnection.prototype.getTypeByMid = function(mid){
  */
 PeerConnection.prototype.getCaptureStream = function(number){
     let captureStreamArray = []
-    // add canvass
     let canvas = document.createElement("canvas");
     canvas.id = 'canvasForCaptureStream'
     canvas.style.cssText = "display: none"
 
-    for(let i = 0; i<number; i++){
-        let stream = canvas.captureStream();
+    function gum() {
+        let stream = null
+        if(canvas.captureStream){
+            stream = canvas.captureStream(5);
+        }else if(canvas.mozCaptureStream){
+            stream = canvas.mozCaptureStream(5);
+        }else {
+            log.warn('Current browser does not support captureStream!!')
+            return
+        }
         log.info("get captureStream: ", stream)
+        return stream
+    }
+
+    for(let i = 0; i<number; i++){
+        let stream = gum();
         captureStreamArray.push(stream)
     }
+    canvas = null
     return captureStreamArray
 }
 
@@ -166,6 +160,7 @@ PeerConnection.prototype.getCaptureStream = function(number){
  * @returns {*}
  */
 PeerConnection.prototype.getStreamType = function(type, isLocal){
+
     let streamType = null
     if(isLocal){
         switch (type) {
@@ -249,7 +244,9 @@ PeerConnection.prototype.setStream = function(stream, type, isLocal){
     log.info('set ' + streamType + ' stream id: ' + streamId)
     this.gsRTC.MEDIA_STREAMS[streamType] = stream
 
-    this.setMediaElementStream(stream, type, isLocal)
+    if(stream){
+        this.setMediaElementStream(stream, type, isLocal)
+    }
 }
 
 /***
@@ -284,8 +281,7 @@ PeerConnection.prototype.getStream = function(type, isLocal){
  * }
  */
 PeerConnection.prototype.streamMuteSwitch = function(data){
-
-    if(data.stream != null && data.stream !== undefined){
+    if(data.stream){
         log.info("MuteStream: stream id = " + data.stream.id);
     }else {
         log.warn("stream is not exist!")
@@ -307,7 +303,7 @@ PeerConnection.prototype.streamMuteSwitch = function(data){
                 }
             }
         }
-    } else if( (data.type === 'video' || data.type === 'slides') && data.stream.getVideoTracks().length > 0 ){
+    } else if( (data.type === 'video' || data.type === 'slides' ) && data.stream.getVideoTracks().length > 0 ){
         for ( let j = 0; j < data.stream.getVideoTracks().length; j++ ) {
             if (data.mute){
                 if ( data.stream.getVideoTracks()[j].enabled === true ) {
@@ -339,9 +335,9 @@ PeerConnection.prototype.getTransceiverMid = function(pc, type){
         if(type && pc.getTransceivers().length > 0){
             let transceiver = pc.getTransceivers()
             for(let i = 0; i<transceiver.length; i++){
-                if((type === 'audio' && transceiver[i].mid === '0') || (type === 'main' && transceiver[i].mid === '1') || (type === 'slides' && transceiver[i].mid === '2')) {
+                if((type === 'audio' && transceiver[i].mid === '0') || (type === 'main' && transceiver[i].mid === '1') || (type === 'slides' && transceiver[i].mid === '2') /*|| (type === 'gui' && transceiver[i].mid === '3')*/) {
                     mid = i
-                    log.info('get transceiver mid' + mid)
+                    log.info('get transceiver mid:' + mid)
                 }
             }
         }
@@ -431,12 +427,15 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
         /** see bug 137445 for safari 11.0.2 and 11.1.2 * */
         let browserDetail = this.gsRTC.getBrowserDetail()
         if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2") && pc.getSenders().length > 0){
-            pc.getSenders()[mid].track.enablsed = false;
+            pc.getSenders()[mid].track.enabled = false;
         }else if(stream){
             pc.removeStream(stream);
         }
         log.info('use removeStream to remove stream ');
     }
 }
+
+
+
 
 

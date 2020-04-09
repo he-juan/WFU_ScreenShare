@@ -3,126 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <title>WUF 联调demo</title>
-    <script src="src/debug.js"></script>
-    <script type="text/javascript" src="src/sdp_tools.js"></script>
-    <script src="src/mediaDevice.js"></script>
-    <script type="text/javascript" src="src/common.js"></script>
-    <script type="text/javascript" src="src/sha256.js"></script>
-    <style>
-        body{
-            background-image: linear-gradient(to right, #46d3e5 , #7abab6);
-        }
-        .video-setting audio,video{
-            border: 1px solid #b95050;
-            width: 300px;
-            height: 225px;
-        }
-        input {
-            height: 40px;
-            background: brown;
-            color: aliceblue;
-            font-size: 15px;
-            width: 200px;
-        }
-        .btn-default{
-            width: 150px;
-            height: 40px;
-            background-color: #cf5248;
-            color: white;
-            margin: 8px 5px;
-            padding: 3px;
-            border: 0;
-            border-radius: 8px;
-            transition: all 200ms;
-            min-width: 150px;
-            font-size: medium;
-        }
-    </style>
+    <script src="webrtc/public/debug.js"></script>
+    <script type="text/javascript" src="webrtc/public/sdp_tools.js"></script>
+    <script src="webrtc/public/mediaDevice.js"></script>
+    <link rel="stylesheet" href="./main.css">
 </head>
 <body>
 
+<!--设备选择区域-->
+<div>
+    <div class="outputSelector device-mask">
+        <select class="deviceSelect" id="audioList" onchange='switchAudioSource()'>
+            <option value="default">请选择</option>
+        </select>
+        <div class="audio-tag">Select audio output</div>
+    </div>
 
-<h1>Local audio/video</h1>
+    <div class="outputSelector device-mask">
+        <select class="deviceSelect" id="videoList" onchange="shareVideo()">
+            <option value="default">请选择</option>
+        </select>
+        <div class="video-tag">Select video output</div>
+    </div>
+</div>
 
+<!--视频显示区-->
 <div class="video-setting">
     <table>
-        <thead>
-        <tr>
-            <th>localVideo</th>
-            <th>localVideo2</th>
-            <th>localPresent</th>
-        </tr>
-        </thead>
         <tbody>
-        <tr>
-            <td><video id="localVideo" playsinline autoplay></video></td>
-            <td><video id="localVideo2" playsinline autoplay></video></td>
-            <td><video id="localPresentVideo" playsinline autoplay></video></td>
-            <td><audio id="localAudio" autoplay muted></audio></td>
-        </tr>
+            <!--本地端视频显示区域-->
+            <tr>
+                <td><video id="localVideo" playsinline autoplay></video></td>
+                <td><video id="localVideo2" playsinline autoplay></video></td>
+                <td><video id="localPresentVideo" playsinline autoplay></video></td>
+                <td><audio id="localAudio" autoplay muted></audio></td>
+            </tr>
+            <tr>
+                <td>localVideo</td>
+                <td>localVideo2</td>
+                <td>localPresent</td>
+            </tr>
+            <!--远端视频显示-->
+            <tr>
+                <td><video id="remoteVideo" playsinline autoplay></video></td>
+                <td><video id="remoteVideo2" playsinline autoplay></video></td>
+                <td><video id="remotePresentVideo" playsinline autoplay></video></td>
+                <td><audio id="remoteAudio" autoplay></audio></td>
+            </tr>
+            <tr>
+                <td>remoteVideo</td>
+                <td>remoteVideo2</td>
+                <td>remotePresent</td>
+            </tr>
         </tbody>
     </table>
 </div>
-
-<h1>Remote audio/video</h1>
-<div class="video-setting">
-    <table>
-        <thead>
-        <tr>
-            <th>remoteVideo</th>
-            <th>remoteVideo2</th>
-            <th>remotePresent</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td><video id="remoteVideo" playsinline autoplay></video></td>
-            <td><video id="remoteVideo2" playsinline autoplay></video></td>
-            <td><video id="remotePresentVideo" playsinline autoplay></video></td>
-            <td><audio id="remoteAudio" autoplay></audio></td>
-        </tr>
-        </tbody>
-    </table>
-</div>
-
+<hr>
+<!--操作区-->
 <div>
     <!--本地服务器-->
-    <input type="text" value="ws://192.168.131.180:10200" class="form-control"  id="wsAddr" style="background: white;color: black;width:390px;display:inline">
-    <!--IPVT服务器-->
-    <!--<input type="text" value="wss://xmeetings.ipvideotalk.com:443/ws" class="form-control"  id="wsAddr" style="width:390px;display:inline">-->
-    <button type="button" class="btn btn-default" onclick="addWebSocket();" >连接</button>
-    <input type="button" class="btn-default" value="挂断"  onclick="hangup()">
-
+    <input type="text" value="ws://192.168.131.126:10200" class="form-control" id="wsAddr" >
+    <button type="button" class="btn btn-default" onclick="multiStreamCall();">multiStreamCall</button>
+    <button type="button" class="btn btn-default" id="startVideoShare" onclick="videoOperation(1)">开摄像头</button>
+    <button type="button" class="btn btn-default" id="stopVideoShare" onclick="videoOperation(0)">关摄像头</button>
+    <button type="button" class="btn btn-default" id="startPresent" onclick="startPresent(1)">开演示</button>
+    <button type="button" class="btn btn-default" id="pausePresent" hidden onclick="presentPauseOperation()">暂停演示</button>
+    <button type="button" class="btn btn-default" id="stopPresent" onclick="startPresent(0)">关闭演示</button>
+    <button type="button" class="btn btn-default" onclick="hangup()">挂断</button>
     <hr>
-    <button type="button" class="btn btn-default" onclick="startPresent(1);" >开启演示</button>
-    <button type="button" class="btn btn-default" onclick="startPresent(0);" >关闭演示</button>
-    </button>
-    <!--    </div>-->
 </div>
 
-
-<!--取流：加载canvas动画-->
-<canvas id="canvasForCaptureStream" width="700px" height="700px" style=" background-image: url(background.jfif); display: none;float: left;"></canvas>
-<canvas id='slidesCanvas' width="700px" height="700px" style="display: none;float: left;"></canvas>
-<script src="./canvas_curve_animation.js"></script>
-<!--取流：结束加载canvas动画-->
-
-<script src="src/gsrtc.js"></script>
-<script src="src/gsrtc_api.js"></script>
-<script src="src/gsrtc_sdp.js"></script>
-<script src="src/gsrtc_code.js"></script>
-<script src="src/gsrtc_common.js"></script>
-<script src="src/gsrtc_signaling.js"></script>
-<script src="src/gsrtc_jsep.js"></script>
-<script src="src/gsrtc_connection.js"></script>
-<script src="src/gsrtc_constants.js"></script>
-<script src="src/gsrtc_event.js"></script>
-<script src="src/gsrtc_stream.js"></script>
-<script src="src/gsrtc_ice.js"></script>
-<script src="src/gsrtc_resolution.js"></script>
-<script src="src/gsrtc_sdp.js"></script>
-<script src="src/gsrtc_websocket.js"></script>
-<!--<script src="dist/gsRTC.min.js"></script>-->
+<script src="./webrtc/src/gsrtc_api.js"></script>
+<script src="./webrtc/src/gsrtc_sdp.js"></script>
+<script src="./webrtc/src/gsrtc_common.js"></script>
+<script src="./webrtc/src/gsrtc_jsep.js"></script>
+<script src="./webrtc/src/gsrtc_connection.js"></script>
+<script src="./webrtc/src/gsrtc_constants.js"></script>
+<script src="./webrtc/src/gsrtc_event.js"></script>
+<script src="./webrtc/src/gsrtc_stream.js"></script>
+<script src="./webrtc/src/gsrtc_ice.js"></script>
+<script src="./webrtc/src/gsrtc_resolution.js"></script>
+<script src="./webrtc/src/gsrtc_sdp.js"></script>
+<script src="./webrtc/src/gsrtc_websocket.js"></script>
+<script src="webrtc/webrtc.api.js"></script>
+<!--<script type="text/javascript" src="dist/gsRTC.min.js"></script>-->
 <script src="index.js"></script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 /*Log Debug Start*/
 var log = {};
-log.debug = window.debug("JSEP:DEBUG");
-log.log = window.debug("JSEP:LOG");
-log.info = window.debug("JSEP:INFO");
-log.warn = window.debug("JSEP:WARN");
-log.error = window.debug("JSEP:ERROR");
+log.debug = window.debug("GARTC_JSEP:DEBUG");
+log.log = window.debug("GARTC_JSEP:LOG");
+log.info = window.debug("GARTC_JSEP:INFO");
+log.warn = window.debug("GARTC_JSEP:WARN");
+log.error = window.debug("GARTC_JSEP:ERROR");
 /*Log Debug End*/
 
 /**
@@ -16,92 +16,7 @@ log.error = window.debug("JSEP:ERROR");
 let PeerConnection = function (config, gsRTC) {
     this.gsRTC = gsRTC
     this.conf = config
-    this.deviceId = null
     this.peerConnections = []
-}
-
-/**
- * create PeerConnection instance
- */
-PeerConnection.prototype.createRTCSession = async function (conf) {
-    log.info('Get lo: create webRTC session')
-    let This = this
-    try {
-        let sessionsConfig = conf.sessionsConfig ? conf.sessionsConfig : {}
-        if (sessionsConfig) {
-            if (!this.peerConnections) {
-                this.peerConnections = []
-            }
-            for (let i = 0; i < sessionsConfig.length; i++) {
-                let type = sessionsConfig[i]
-                this.peerConnections[type] = this.createPeerConnection(type, conf)
-                // for wfu add stream
-                // let pc = this.peerConnections[type]
-                // let stream
-                // if(type === 'audio'){
-                //     stream = await navigator.mediaDevices.getUserMedia({audio: true, video: false})
-                //     console.warn(pc.type + " add stream: ", stream.id)
-                // }else if(type === 'main'){
-                //     stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {width: 640, height: 360}})
-                //     console.warn(pc.type + " add stream: ", stream.id)
-                //
-                // }else if(type === 'video1'){
-                //     // stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {width: 1280, height: 720}})
-                //     // console.warn(pc.type + " add stream: ", stream.id)
-                // }else if(type === 'slides'){
-                //     let constraints = {
-                //         audio: false,
-                //         video: {
-                //             width: { max: 1920, },
-                //             height: { max: 1080,},
-                //             frameRate: { max: 15,}
-                //         }
-                //     };
-                //
-                //     if('getDisplayMedia' in window.navigator){
-                //         stream = await navigator.getDisplayMedia(constraints)
-                //     }else if('getDisplayMedia' in window.navigator.mediaDevices){
-                //         stream = await navigator.mediaDevices.getDisplayMedia(constraints)
-                //     }else {
-                //         log.warn("The browser does not support the getDisplayMedia interface.");
-                //     }
-                //
-                // }
-                //
-                // if(stream){
-                //     console.warn(pc.type + ' add stream')
-                //     This.setMediaElementStream(stream, type, true)
-                //     pc.addStream(stream)
-                // }
-
-                if(type === 'main'){
-                    log.warn('add '+ type + ' stream')
-                    let stream = getCaptureStream(type)
-                    log.info('get stream : ', stream.id)
-                    This.setStream(stream, type, true)
-
-                    let pc = this.peerConnections[type]
-                    pc.addStream(stream)
-                }
-
-                if(type === 'slides'){
-                    log.warn('add '+ type + ' stream')
-                    let stream = getSlidesCaptureStream(type)
-                    log.info('get stream : ', stream.id)
-                    This.setStream(stream, type, true)
-
-                    let pc = this.peerConnections[type]
-                    pc.addStream(stream)
-                }
-
-                this.doOffer(this.peerConnections[type])
-            }
-        } else {
-            log.warn('can not create RTCSession with conf is null')
-        }
-    } catch (e) {
-        log.error(e)
-    }
 }
 
 /**
@@ -117,7 +32,7 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
 
         this.peerConnections[type] = This.createPeerConnection(type, conf)
         let pc = this.peerConnections[type]
-        // create transceiver
+
         if(RTCPeerConnection.prototype.addTransceiver){
             log.info('use addTransceiver to add transceiver ');
             // add audio Transceiver to keep audio media first
@@ -132,7 +47,6 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
                 let stream = streamArray[i]
                 log.info('add stream to peerConnection: ' + stream.id)
                 pc.addStream(stream)
-                // stream.getTracks().forEach(track => pc.addTrack(track, stream));
             }
         }
 
@@ -151,13 +65,14 @@ PeerConnection.prototype.subscribeStreamEvents = function (pc) {
     if (this.gsRTC.isReplaceTrackSupport()) {
         pc.ontrack = function (evt) {
             log.info('__on_add_track')
-            let type = This.gsRTC.enableMultiStream ? This.getTypeByMid(evt.transceiver.mid) : pc.type
-            This.setStream(evt.streams[0], type, false)
+            if(evt.streams[0]){
+                let type = This.getTypeByMid(evt.transceiver.mid)
+                This.setStream(evt.streams[0], type, false)
 
-            evt.streams[0].onremovetrack = function (evt) {
-                log.info('__on_remove_track')
-                let type = This.gsRTC.enableMultiStream ? This.getTypeByStreamId(evt.currentTarget.id) : pc.type
-                This.setStream(null, type, false)
+                evt.streams[0].onremovetrack = function (evt) {
+                    log.info('__on_remove_track')
+                    This.setStream(null, type, false)
+                }
             }
         }
     } else {
@@ -168,7 +83,7 @@ PeerConnection.prototype.subscribeStreamEvents = function (pc) {
         }
         pc.onremovestream = function (evt) {
             log.info('__on_remove_stream')
-            let type = This.gsRTC.enableMultiStream ? This.getTypeByStreamId(evt.currentTarget.id) : pc.type
+            let type = This.getTypeByStreamId(evt.currentTarget.id)
             This.setStream(null, type, false)
         }
     }
@@ -219,7 +134,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     this.subscribeStreamEvents(pc)
 
     // 服务器回复的200 ok中，audio默认 sendrecv，不添加流的话会报错："Answer tried to set recv when offer did not set send"
-    if((type === 'audio' || type === 'multiStreamPeer') && !This.gsRTC.MEDIA_STREAMS.LOCAL_AUDIO_STREAM){
+    if(!This.gsRTC.MEDIA_STREAMS.LOCAL_AUDIO_STREAM){
         if(This.gsRTC.getBrowserDetail().browser === 'firefox' && This.gsRTC.getBrowserDetail().version > 60){
             log.warn('firefox get fake stream')
             function getMediaCallBack(data){
@@ -286,8 +201,8 @@ PeerConnection.prototype.doOffer = async function (pc) {
     log.info('Creating offer');
 
     pc.offerConstraints = {
-        offerToReceiveAudio: pc.type === 'multiStreamPeer' ? true : pc.type === 'audio',
-        offerToReceiveVideo: pc.type === 'multiStreamPeer' ? true : pc.type !== 'audio'
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
     }
 
     async function onCreateOfferSuccess(desc) {
@@ -386,29 +301,18 @@ PeerConnection.prototype.onCreateLocalDescriptionError = function (error) {
  * setRemoteDescription when answer sdp from the server
  * @param sdp
  */
-PeerConnection.prototype.setRemote = function (sdp) {
+PeerConnection.prototype.setRemote = async function (sdp) {
     let This = this
-
-    async function setRo(pc, sdp) {
-        try {
-            log.info('setRemoteDescription (' + pc.type + ')')
-            let roSdp = This.gsRTC.getSdpByType(pc.type, sdp)
-            log.info('onSignalingStateChange type: ' + pc.type + ', signalingState: ' + pc.signalingState)
-            let desc = new window.RTCSessionDescription({type: 'answer', sdp: roSdp})
-            await pc.setRemoteDescription(desc)
-            This.setRemoteDescriptionSuccess(pc)
-        } catch (e) {
-            This.onSetRemoteDescriptionError(e);
-        }
-    }
-
-    for (let key in this.peerConnections) {
-        let pc = this.peerConnections[key]
-        if (pc.signalingState !== 'have-local-offer') {
-            log.info(pc.type + " dropping of setRemoteDescription as signalingState is " + pc.signalingState);
-            continue;
-        }
-        setRo(pc, sdp)
+    try {
+        let pc = gsRTC.RTCSession.peerConnections['multiStreamPeer']
+        log.info('setRemoteDescription (' + pc.type + ')')
+        let roSdp = This.gsRTC.getSdpByType(pc.type, sdp)
+        log.info('onSignalingStateChange type: ' + pc.type + ', signalingState: ' + pc.signalingState)
+        let desc = new window.RTCSessionDescription({type: 'answer', sdp: roSdp})
+        await pc.setRemoteDescription(desc)
+        This.setRemoteDescriptionSuccess(pc)
+    } catch (e) {
+        This.onSetRemoteDescriptionError(e);
     }
 }
 
@@ -419,26 +323,29 @@ PeerConnection.prototype.setRemote = function (sdp) {
 PeerConnection.prototype.setRemoteDescriptionSuccess = function (pc) {
     log.info('setRemoteDescription success ( ' + pc.type + ')')
     this.gsRTC.inviteProcessing = false
-    let stream = this.getStream(pc.type, true)
-    if (pc.type === 'main' && stream && stream.active === true && !window.wfu) {
-        log.info(pc.type + " prepare get new stream")
-        this.getNewStream(pc)
+
+    let sendPermission
+    if(window.isPresentShare === true  || window.isMainShare === true){
+        sendPermission = 1
+    }else if(window.isPresentShare === 'stop' || window.isMainShare === 'stop'){
+        sendPermission = 0
     }
 
-    // ice restart的时候，处理完前面的invite之后再处理后面的invite
-    for(let i = 0; i<this.gsRTC.sendInviteQueue.length; i++){
-        let item = this.gsRTC.sendInviteQueue[i]
-        if(item.type === pc.type && item.action ===  pc.action){
-            this.gsRTC.sendInviteQueue.splice(i, 1)
-            pc.action = null
-            if(this.gsRTC.sendInviteQueue && this.gsRTC.sendInviteQueue.length > 0){
-                this.gsRTC.action = this.gsRTC.sendInviteQueue[0].action
-                let type =  this.gsRTC.sendInviteQueue[0].type
-                let pc = this.gsRTC.RTCSession.peerConnections[type]
-                this.doOffer(pc)
-            }
+    let reqId = parseInt(Math.round(Math.random() * 100));
+    let digital = {
+        ctrlPresentation: {
+            userName: "wfu_test",
+            reqId: reqId,
+            sendPermission: sendPermission,
         }
     }
+    log.info("send ctrlPresentation: \n" + JSON.stringify(digital, null, '    '));
+
+    if (gsRTC && gsRTC.sokect) {
+        gsRTC.sokect.ws.send(JSON.stringify(digital))
+    }
+    window.isMainShare = false
+    window.isPresentShare = false
 }
 
 /**
@@ -448,75 +355,4 @@ PeerConnection.prototype.setRemoteDescriptionSuccess = function (pc) {
 PeerConnection.prototype.onSetRemoteDescriptionError = function (error) {
     log.error(`Failed to set remote description: ${error}`);
     console.error(error)
-}
-
-/**
- * handle server re-invite
- * @param sdp
- */
-PeerConnection.prototype.handleOffer = function (sdp) {
-    let This = this
-
-    async function setRo(pc) {
-        try {
-            log.info('setRemoteDescription (' + pc.type + ')')
-            let roSdp = This.gsRTC.getSdpByType(pc.type, sdp)
-            log.info('onSignalingStateChange type: ' + pc.type + ', signalingState: ' + pc.signalingState)
-            let desc = new window.RTCSessionDescription({type: 'offer', sdp: roSdp})
-            await pc.setRemoteDescription(desc)
-            This.setRemoteDescriptionSuccess(pc)
-            This.doAnswer(pc)
-        } catch (e) {
-            This.onSetRemoteDescriptionError(e);
-        }
-    }
-
-    for (let key in this.peerConnections) {
-        let pc = this.peerConnections[key]
-        if (pc.signalingState !== 'stable') {
-            log.info(pc.type + " dropping of creating of offer as signalingState is not stable");
-            continue;
-        }
-
-        let newRo = This.gsRTC.getSdpByType(pc.type, sdp)
-        let currentRo = pc.currentRemoteDescription ? pc.currentRemoteDescription : pc.remoteDescription
-        // Compare the sdp of each peerConnection after receiving sdp each time
-        if (!This.gsRTC.isObjectXExactlyEqualToY(newRo, currentRo)) {
-            setRo(pc)
-        } else {
-            log.info('current remote description is not change')
-        }
-    }
-}
-
-/***
- * JSEP rollback operation for 491 invite conflict
- * plan one: setRemoteDescription direct
- */
-PeerConnection.prototype.rollbackOperation = async function () {
-    log.info('jsep rollback operation')
-    var This = this
-
-    // setRemoteDescription direct
-    async function setRemote(pc) {
-        log.warn(pc.type + " peerConnection signalingState: " + pc.signalingState)
-        try {
-            let sdp = pc.currentRemoteDescription ? pc.currentRemoteDescription : pc.remoteDescription
-            let description = new window.RTCSessionDescription(sdp)
-            await pc.setRemoteDescription(description)
-            This.setRemoteDescriptionSuccess(pc)
-        } catch (e) {
-            This.onSetRemoteDescriptionError(error);
-        }
-    }
-
-    for (let i = 0; i < This.peerConnections.length; i++) {
-        let pc = This.peerConnections[i]
-        if (pc.signalingState === 'have-local-offer') {
-            setRemote(pc)
-        }
-    }
-
-    log.info('set isProcessingInvite to false')
-    This.gsRTC.isProcessingInvite = false
 }
