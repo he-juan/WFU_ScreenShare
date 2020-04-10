@@ -50,11 +50,57 @@
     + 关闭peerConnection，关闭webSocket连接
 
 
+### mid 和content 说明
+
+- audio
+    - a=mid:0
+- main
+    - a=mid:1
+    - a=content:main
+- slides
+    - a=mid:2
+    - a=content:slides
+- gui
+    - a=mid:3
+    - a=content:gui
+
+
+> 通过mid标识媒体行，content区分主流、演示流、gui视频流
+
 ### FAQ
 
 1、开演示发送 updateMediaSession 和 ctrlPresentation，并处理成功后，遇到ice failed，再次重新updateMediaSession，没有发送ctrlPresentation，此时gs_phone不显示演示流
 
 2、使用captureStream创建三个m行时，audio会在最后面，sdp处理就会出现错误
+
+- 修改 BUNDLE 信息：[done]
+
+```
+a=group:BUNDLE 0 1 2
+a=msid-semantic: WMS c18e53b4-248f-4502-9ad2-1b147e638883
+
+// 替换为：每路流单独发送
+a=msid-semantic: WMS
+a=msid-semantic: WMS
+a=msid-semantic: WMS
+a=group:BUNDLE 0
+a=group:BUNDLE 1
+a=group:BUNDLE 2
+```
+
+- 如果没有流，则删除sdp中的ssrc等相应字段 [done]
+
+- 合并sdp [done]
+
+- 修改mid [done]
+
+- 根据编解码名称去除对应编解码[done]
+
+- Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
+Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.
+
+处理：收到sdp后，设置时，要修改mid为原来的值
+
 
 
 

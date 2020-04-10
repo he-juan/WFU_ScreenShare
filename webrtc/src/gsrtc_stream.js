@@ -118,30 +118,6 @@ PeerConnection.prototype.getTypeByStreamId = function(streamId){
 }
 
 /**
- * get current stream type by transceiver mid
- * @param mid
- */
-PeerConnection.prototype.getTypeByMid = function(mid){
-    let type
-    switch (mid) {
-        case '0':
-            type = 'audio'
-            break
-        case '1':
-            type = 'main'
-            break
-        case '2':
-            type = 'slides'
-            break
-        default:
-            break
-    }
-    log.info('get type by transceiver mid ' + type)
-
-    return type
-}
-
-/**
  * get stream from canvas
  * @param number
  * @returns {Array}

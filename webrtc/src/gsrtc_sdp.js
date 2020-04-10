@@ -590,3 +590,169 @@ GsRTC.prototype.setResolutionOfSdp = function (sdp, width, height) {
     }
     return sdp
 }
+
+/**
+ * get type by transceiver mid
+ * @param mid
+ */
+GsRTC.prototype.getTypeByMid = function(mid){
+    let type
+    mid = parseInt(mid)
+    switch (mid) {
+        case 0:
+            type = 'audio'
+            break
+        case 1:
+            type = 'main'
+            break
+        case 2:
+            type = 'slides'
+            break
+        case 3:
+            type = 'gui '
+            break
+        default:
+            break
+    }
+    log.info('get type by transceiver mid ' + type)
+
+    return type
+}
+
+/**
+ * 调整m行顺序，使用getCaptureStream创建多个m行时，audio会在最后面
+ * 根据m行数量，修改 a=group:BUNDLE 和a=msid-semantic:
+ * @param sdp
+ * @returns {*}
+ */
+GsRTC.prototype.adjustOrderOfMLines = function (sdp) {
+    log.info('Adjust the order of m lines')
+    let This = this
+    let parseSDP = SDPTools.parseSDP(sdp)
+    let audioArray
+    let videoArray = []
+    let videoMid = 1
+    parseSDP.msidSemantics = []
+    parseSDP.groups = [{type: "BUNDLE", mids: 0}]
+
+    for(let i=0; i< parseSDP.media.length; i++){
+        if(parseSDP.media[i].type === 'audio'){
+            parseSDP.media[i].mid = 0
+            audioArray = parseSDP.media[i]
+        }else {
+            parseSDP.media[i].mid = videoMid
+            parseSDP.media[i].content = This.getTypeByMid(parseSDP.media[i].mid)
+            parseSDP.groups.push({type: "BUNDLE", mids: parseSDP.media[i].mid})
+            videoArray.push(parseSDP.media[i])
+            videoMid ++
+        }
+        parseSDP.msidSemantics.push( {semantic: "", token: "WMS"})
+    }
+    parseSDP.media = [audioArray]
+    parseSDP.media = parseSDP.media.concat(videoArray)
+    sdp = SDPTools.writeSDP(parseSDP)
+
+    return sdp
+}
+
+/**
+ * 删除ssrc字段
+ * @param sdp
+ * @returns {*}
+ */
+GsRTC.prototype.removeSSRC = function (sdp) {
+    log.info('remove ssrc')
+    let This = this
+    let parseSDP = SDPTools.parseSDP(sdp)
+    let stream
+    for(let i=0; i< parseSDP.media.length; i++){
+        let type = This.getTypeByMid(parseSDP.media[i].mid)
+        stream = This.RTCSession.getStream(type, true)
+        if(!stream){
+            log.info('deleted stream info')
+            delete parseSDP.media[i].ssrcGroups
+            delete parseSDP.media[i].ssrcs
+        }
+    }
+    sdp = SDPTools.writeSDP(parseSDP)
+
+    return sdp
+}
+
+/**
+ * 根据编解码名称删除编解码
+ * @param sdp
+ * @returns {*}
+ */
+GsRTC.prototype.removeCodeByName = function (sdp) {
+    log.info('remove ssrc')
+    let lines = sdp.split('\n')
+    let removePayloads = [0, 8, 106, 105, 13, 110, 112, 113, 98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116]
+
+    function getMLinePosition(lines){
+        // 获取所有m行的位置
+        let arr = []
+        for(let index in lines){
+            if(lines[index].indexOf('m=') >= 0){
+                arr.push(parseInt(index))
+            }
+        }
+        arr.push(lines.length)
+        return arr
+    }
+
+    function getPtNumber(arr){
+        arr = arr.split('\n')
+        let deleteCodeArray = []
+        for(let j in arr){
+            if(arr[j].indexOf('a=rtpmap') >=0 && (arr[j].indexOf(deleteCodeName[0]) >=0 || arr[j].indexOf(deleteCodeName[1]) >=0 )){
+                let pt = arr[j].substr(9, 3);
+                deleteCodeArray.push(pt)
+            }
+        }
+        return deleteCodeArray
+    }
+
+    function codecRemove(sdpLine){
+        let deletePt = getPtNumber(sdpLine)
+        let parseSDP = SDPTools.parseSDP(sdpLine)
+        deletePt = deletePt.concat(removePayloads)
+        SDPTools.removeCodecByPayload(parseSDP, 0, deletePt)
+        sdpLine = SDPTools.writeSDP(parseSDP)
+        return sdpLine
+    }
+
+    function deleteHead(sdp) {
+        let lines = sdp.split('\n')
+        for(var k = 0; k<lines.length; k++){
+            if(lines[k].indexOf('m=') >= 0){
+                sdpArray[0] = lines.slice(0, k)
+                sdp = lines.slice(k, lines.length).join('\n')
+            }
+        }
+        return sdp
+    }
+
+    let positions = getMLinePosition(lines)
+    let deleteCodeName = ['VP8', 'VP9']
+    // 根据m行位置分割sdp数组
+    let sdpArray = []
+    let nextIndex = 0
+    let head = lines.slice(0, positions[0])
+    for(let i = 0;i<positions.length; i++){
+        nextIndex = i +1
+        if(positions[nextIndex]){
+            let arr = lines.slice(positions[i], positions[nextIndex])
+            arr = head.concat(arr).join('\n')
+            arr = codecRemove(arr)
+            sdpArray.push(arr)
+        }
+    }
+
+    let result = head.join('\n') + '\n'
+    for(let item of sdpArray){
+        item = deleteHead(item)
+        result = result + item
+    }
+    return result
+}
