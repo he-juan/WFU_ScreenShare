@@ -73,6 +73,9 @@ GsRTC.prototype.trigger = function(eventName) {
             }
         }
     }
+
+    // After the event monitoring is completed, delete the callback event
+    this.off(eventName)
 }
 
 /**

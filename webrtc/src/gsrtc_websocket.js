@@ -25,7 +25,6 @@ let WebSocketInstance = function (url, protocol) {
     }
 
     if(this instanceof WebSocketInstance){
-        this.isChannelOpen = false
         this.ws = this.createWebSocket(url, protocol)
     }else {
         return new WebSocketInstance()
@@ -61,8 +60,8 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
         This.isChannelOpen = false
     }
 
-    ws.onerror = function (event) {
-        log.info('websocket onerror')
+    ws.onerror = function (error) {
+        log.info('websocket onerror' + error.toString())
     }
 
     return ws
@@ -70,85 +69,90 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
 
 /**
  * 处理收到的 webSocket消息
- * @param data
+ * @param message
  */
-WebSocketInstance.prototype.handleIncomingMessage = function(data){
-    log.info('handleIncomingMessage')
-    let dataType = Object.prototype.toString.call(data)
-    let parseDate = JSON.parse(data)
+WebSocketInstance.prototype.handleIncomingMessage = function(message){
+    let messageObj = JSON.parse(message)
+    let action = Object.keys(messageObj)[0]
+    log.info('handleIncomingMessage of: ' + action)
+    let code = null
+    if(messageObj.errorInfo){
+        code = messageObj.errorInfo.errorId;
+    }
 
-    // let signalType = data.type
-    // switch (signalType) {
-    //     case gsRTC.SIGNAL_EVENT_TYPE.INVITE:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.PRESENT:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET:
-    //
-    //         break;
-    //
-    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO:
-    //
-    //         break;
-    //
-    //     case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET:
-    //
-    //         break;
-    //     case gsRTC.SIGNAL_EVENT_TYPE.BYE:
-    //
-    //         break;
-    //
-    //     case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET:
-    //
-    //         break;
-    //     default:
-    //         break
-    // }
-
-
-    switch (dataType) {
-        case '[object String]':
-            Object.keys(parseDate).forEach(function(action) {
-                let code = parseDate[action].errorInfo.errorId
-                if(gsRTC.isNxx(2, code)){
-                    if(parseDate[action].sdp) {
-                        let sdp = parseDate[action].sdp.data
-                        gsRTC.RTCSession.handleRemoteSDP(sdp)
-                    }
-                }else if(gsRTC.isNxx(4, code)){
-                    log.warn('receive 4xx: ' + code)
-                }
-
-                gsRTC.trigger(gsRTC.action, {codeType: code});
-                gsRTC.off(gsRTC.action)     // 事件监听完成后，删除该回调事件
-                gsRTC.action = null
-            });
+    switch (action) {
+        case gsRTC.SIGNAL_EVENT_TYPE.INVITE_RET.name:
+        case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE_RET.name:
+            // gs_phone的主动呼叫和主动更新会话信息，目前没有实现，但是需要考虑
+            if(gsRTC.isNxx(2, code)){
+                let sdp = messageObj.sdp.data
+                gsRTC.RTCSession.handleRemoteSDP(sdp)
+            }else if(gsRTC.isNxx(4, code)){
+                log.error(code + ', ' + messageObj.errorInfo.message)
+            }
+            break;
+        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT.name:
+            // gs_phone请求开演示
+            if(messageObj.sendPermission === 2){
+                log.warn('receive request to turn off desktop sharing')
+                stopScreen()
+            }else if(messageObj.sendPermission === 3){
+                log.warn('receive request to turn on desktop sharing')
+                beginScreen()
+            }
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET.name:
+            if(gsRTC.isNxx(2, code)){
+                log.info('present on request success')
+            }else if(gsRTC.isNxx(4, code)){
+                log.warn('present on request error')
+                log.error('present on request error: ' + messageObj.errorInfo.message)
+            }
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.BYE.name:
+            break
+        case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET.name:
             break
         default:
-            log.warn("event.data type: ", dataType)
             break
+    }
+
+    gsRTC.trigger(gsRTC.action, {codeType: code});
+    gsRTC.action = null
+}
+
+/**
+ * 处理共享信令：摄像头或桌面共享
+ */
+WebSocketInstance.prototype.handleSharingSignal = function(){
+    let This = this
+    log.info('handle signal')
+    if(gsRTC.isNonInviteSignalNeed){
+        let permission = {
+            value: gsRTC.sharingPermission
+        }
+        log.info('prepare send control signal: ' + permission.value)
+        This.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission})
+
+        gsRTC.isNonInviteSignalNeed = false
+        gsRTC.sharingPermission = gsRTC.sharingPermission ? 0 : 1
     }
 }
 
 /**
- * send message
+ * 根据交互设计协议，发送不同结构体信息
  * @param data
  */
 WebSocketInstance.prototype.sendMessage = function (data) {
@@ -158,83 +162,43 @@ WebSocketInstance.prototype.sendMessage = function (data) {
     }
 
     let reqId = parseInt(Math.round(Math.random()*100));
-    let message
-    let signalType = data.type
+    let info = {
+        userName: gsRTC.conf.userName,
+        reqId: reqId,
+    }
 
-    switch (signalType) {
-        case gsRTC.SIGNAL_EVENT_TYPE.INVITE:
-            message = {
-                createMediaSession: {
-                    userName: "webRTC_Client",
-                    reqId: reqId,
-                    sdp: {
-                        length: data.sdp.length,
-                        data: data.sdp,
-                    }
-                }
-            }
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE:
-            message = {
-                updateMediaSession: {
-                    userName: "webRTC_Client",
-                    reqId: reqId,
-                    sdp: {
-                        length: data.sdp.length,
-                        data: data.sdp,
-                    }
-                }
-            }
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT:
-            message = {
-                ctrlPresentation: {
-                    userName: "webRTC_Client",
-                    reqId: reqId,
-                    sendPermission: data.permission,
-                }
-            }
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET:
-
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE:
-
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET:
-
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO:
-
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET:
-
-            break;
-
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO:
-
-            break;
-
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET:
-
-            break;
-        case gsRTC.SIGNAL_EVENT_TYPE.BYE:
-            message = {
-                destroyMediaSession: {
-                    userName: "webRTC_Client",
-                    reqId: reqId
-                }
-            }
-            break;
-
-        case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET:
-
-            break;
-        default:
-            break
+    if(data.sdp){
+        // invite 或 re-invite
+        info.sdp = {
+            length: data.sdp.length,
+            data: data.sdp,
+        }
+        log.info('Establish or update a session')
+    }else if(data.permission){
+        // 开演示或关演示
+        info.sendPermission = data.permission.value
+        log.info('send present control message: \n' + JSON.stringify(info))
+    }else if(data.messageContent){
+        // 发送message消息
+        Object.keys(content).forEach(function(index) {
+            info[index] = content[index]
+        });
+        log.info('send message')
+    }else if(data.userInfo){
+        // 更新用户信息
+        info.userInfo = data.userInfo
+        log.info('client update user info')
+    }else if(data.candidates){
+        // trickle-ice时，发送收集的candidate
+        info.mid = data.mid
+        info.candidates = data.candidates
+        log.info('trickle-ice, send candidates')
     }
 
     log.warn("ws send message ");
+    let type = data.type.name
+    let message = {}
+    message[type] = info
     this.ws.send(JSON.stringify(message))
 }
 

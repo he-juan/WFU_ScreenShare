@@ -377,7 +377,7 @@ PeerConnection.prototype.processAddStream = function (stream, pc, type) {
     log.info('process add stream')
     let This = this
 
-    let mid = this.gsRTC.enableMultiStream ? this.getTransceiverMid(pc, type) : 0
+    let mid =  This.getTransceiverMid(pc, type)
     if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */
@@ -425,7 +425,7 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
     let This = this
     log.info('process remove stream')
 
-    let mid = this.gsRTC.enableMultiStream ? this.getTransceiverMid(pc, type) : 0
+    let mid =  This.getTransceiverMid(pc, type)
     if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */

@@ -34,7 +34,6 @@ window.onload = function () {
 }
 
 let pausePresentBtn = document.getElementById("pausePresent");
-
 function multiStreamCall(){
     log.warn("multi stream call ...")
     let wsAddr =  document.getElementById('wsAddr').value
@@ -69,11 +68,11 @@ function videoOperation(operation){
                 log.info("video on callback:",data)
             }
         }
-        shareVideo(data)
+        beginVideo(data)
     }else{
         window.isMaintShare = 'stop'
 
-        stopShareVideo(function (data) {
+        stopVideo(function (data) {
             log.info("Video off callback：", data)
         })
     }
@@ -81,28 +80,19 @@ function videoOperation(operation){
 
 function startPresent(operation) {
     if(operation){
-        window.isPresentShare = true
         pausePresentBtn.hidden = false
-        shareScreen(function (data) {
+        beginScreen(function (data) {
             log.info("开启演示callback：", data)
         })
     }else{
-        window.isPresentShare = 'stop'
         pausePresentBtn.hidden = true
-        stopShareScreen(function (data) {
+        stopScreen(function (data) {
             log.info("关闭演示callback：", data)
         })
     }
 }
 
 function presentPauseOperation(){
-    if(pausePresentBtn.innerHTML === "暂停演示"){
-        window.onpausePresent = true
-        pausePresentBtn.innerHTML = "恢复演示"
-    }else if(pausePresentBtn.innerHTML === "恢复演示"){
-        window.onpausePresent = false
-        pausePresentBtn.innerHTML = "暂停演示"
-    }
     function callback(data){
         if(pausePresentBtn.innerHTML === "暂停演示"){
             log.info("恢复演示callback： ", data)
@@ -111,6 +101,12 @@ function presentPauseOperation(){
         }
 
     }
-    pauseScreenSwitch(window.onpausePresent, callback)
+    if(pausePresentBtn.innerHTML === "暂停演示"){
+        pausePresent(true, callback)
+        pausePresentBtn.innerHTML = "恢复演示"
+    }else if(pausePresentBtn.innerHTML === "恢复演示"){
+        pausePresent(false, callback)
+        pausePresentBtn.innerHTML = "暂停演示"
+    }
 }
 

@@ -15,27 +15,23 @@ log.error = window.debug("WEBRTC_API:ERROR");
 function call(wsAddr, callback) {
     let protocols = 'gs-webrtc-json';
     if(!wsAddr){
-        alert('enter ws value !')
+        alert('INVALID WEBSOCKET ADDRESS：' + wsAddr)
         return
     }
-    let sipCallInfo = {
-        initialResolution: gsRTC.getScreenResolution(),   // 初始Invite视频协商分辨率,
-        enableMultiStream: true,
-        sessionsConfig: ['multiStreamPeer']
-    };
+
     let sipRegisterInfo = {
         protocol: protocols,
         websocketUrl: wsAddr,
     }
-    gsRTC.sokect = new WebSocketInstance(sipRegisterInfo.websocketUrl, sipRegisterInfo.protocol || 'sip')
-    gsRTC.inviteCall(sipCallInfo,callback);
+    gsRTC.sokect = new WebSocketInstance(sipRegisterInfo.websocketUrl, sipRegisterInfo.protocol)
+    gsRTC.inviteCall(callback);
 }
 
 /**
  * 开摄像头
  * @param data
  */
-function shareVideo(data){
+function beginVideo(data){
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -51,7 +47,7 @@ function shareVideo(data){
  * 关闭摄像头
  * @param callback 回调
  */
-function stopShareVideo(callback){
+function stopVideo(callback){
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -61,14 +57,26 @@ function stopShareVideo(callback){
         return
     }
 
-    gsRTC.stopShareVideo(callback)
+    let stream = gsRTC.RTCSession.getStream("main", true)
+    let pc = gsRTC.RTCSession.peerConnection
+    gsRTC.RTCSession.processRemoveStream(stream, pc, 'main')
+    gsRTC.RTCSession.closeStream(stream);
+    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
+    gsRTC.RTCSession.setMediaElementStream(null, 'main', 'true')
+
+    if(callback){
+        callback({codeType: 200})
+    }else {
+        gsRTC.action = 'stopShareScreen'
+        gsRTC.trigger(gsRTC.action, {codeType: 200});
+    }
 }
 
 /**
  * 开启屏幕共享
  * @param callback
  */
-function shareScreen(callback){
+function beginScreen(callback){
     log.info('start present!!')
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
@@ -79,7 +87,8 @@ function shareScreen(callback){
         return
     }
 
-    window.isPresentShare = true
+    gsRTC.isNonInviteSignalNeed = true
+    gsRTC.sharingPermission = 1
     let constraints = {
         audio: false,
         video: {
@@ -103,7 +112,7 @@ function shareScreen(callback){
  * @param isMute：true 暂停，false 取消暂停
  * @param callback
  */
-function pauseScreenSwitch(isMute, callback){
+function pausePresent(isMute, callback){
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -113,18 +122,25 @@ function pauseScreenSwitch(isMute, callback){
         return
     }
 
+
     let type = 'slides'
     let stream = gsRTC.RTCSession.getStream(type, true)
     log.info('pause present stream')
     gsRTC.RTCSession.streamMuteSwitch({type: type, stream: stream, mute: isMute})
-    callback({codeType: 200})
+
+    if(callback){
+        callback({codeType: 200})
+    }else {
+        gsRTC.action = 'switchScreenSource'
+        gsRTC.trigger(gsRTC.action, {codeType: 200});
+    }
 }
 
 /**
  * 停止桌面共享
  * @param callback
  */
-function stopShareScreen(callback){
+function stopScreen(callback){
     log.info('stop present!!')
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
@@ -135,13 +151,19 @@ function stopShareScreen(callback){
         return
     }
 
-    let stream = gsRTC.RTCSession.getStream("slides", true)
-    gsRTC.RTCSession.closeStream(stream);
-    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: 0})
-    gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
 
+    let stream = gsRTC.RTCSession.getStream("slides", true)
+    let pc = gsRTC.RTCSession.peerConnection
+    gsRTC.RTCSession.processRemoveStream(stream, pc, 'slides')
+    gsRTC.RTCSession.closeStream(stream);
+
+    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
+    gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
     if(callback){
-        callback()
+        callback({codeType: 200})
+    }else {
+        gsRTC.action = 'switchScreenSource'
+        gsRTC.trigger(gsRTC.action, {codeType: 200});
     }
 }
 

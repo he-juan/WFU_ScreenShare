@@ -8,7 +8,7 @@ PeerConnection.prototype.decorateLocalSDP = function () {
     let sdp
 
     log.warn("decorate multi stream Peer sdp ")
-    let pc = This.peerConnections['multiStreamPeer']
+    let pc = This.peerConnection
     sdp = This.gsRTC.decorateMultiStreamSDP(pc.localDescription.sdp)
     log.info('local sdp:\n' + sdp.toString())
     return sdp

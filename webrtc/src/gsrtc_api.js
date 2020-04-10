@@ -13,20 +13,16 @@ log.error = window.debug("GSRTC_API:ERROR");
 let GsRTC = function (options) {
     this.sokect = null
     this.RTCSession = null
-
     this.EVENTS = []
     // 上层注册事件
     this.handlerFuns = []
+
     this.conf = options;
     this.sessionVersion = 0
-    this.enableMultiStream = false
     this.action = null
-
-    this.transaction = null
-    this.isRecvRequest = false    // true => recv request
-    this.isSendReInvite = false
-    this.inviteProcessing = false
-    this.muteStream = null
+    this.isSendReInvite = false            // 判断是否为re-invite
+    this.isNonInviteSignalNeed = false     // 标记是否发送非invite信令，如ctrlPresentation
+    this.sharingPermission = 0             // 标记共享命令：1开启 0关闭
 
     this.device = new MediaDevice()
     this.eventBindings()
@@ -96,28 +92,18 @@ GsRTC.prototype.addSipEventHandler = function(eventType,handlerFun){
 
 /**
  * call and send invite
- * @param sipCallInfo
  * @param callback
  */
-GsRTC.prototype.inviteCall = function (sipCallInfo,callback) {
-    if(!sipCallInfo){
-        throw new Error('ERR_INVALID_PARAMETER_VALUE');
+GsRTC.prototype.inviteCall = function (callback) {
+    let This = this
+    This.conf = {
+        userName: 'webRTC_Client',
+        initialResolution : This.getScreenResolution()
     }
-
-    if(this.conf){
-        this.conf.sessionsConfig = sipCallInfo.sessionsConfig;
-        this.conf.initialResolution = sipCallInfo.initialResolution
-    }
-    this.action = 'onCall'
-    this.on('onCall', callback)
-    this.RTCSession = new PeerConnection(sipCallInfo, this)
-
-    if(sipCallInfo.enableMultiStream){
-        log.info('set enableMultiStream true')
-        localStorage.setItem("enableMultiStream", 'true');
-        this.enableMultiStream = true
-        this.RTCSession.createMultiStreamRTCSession(this.conf)
-    }
+    This.action = 'onCall'
+    This.on('onCall', callback)
+    This.RTCSession = new PeerConnection(This)
+    This.RTCSession.createMultiStreamRTCSession(This.conf)
 }
 
 
@@ -125,25 +111,26 @@ GsRTC.prototype.inviteCall = function (sipCallInfo,callback) {
  * Leave the meeting
  */
 GsRTC.prototype.closePeerConn = function () {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error("RTCSession is not initialized")
         return
     }
     try {
         // close stream
-        for (let key in this.MEDIA_STREAMS) {
-            let stream = this.MEDIA_STREAMS[key];
+        for (let key in This.MEDIA_STREAMS) {
+            let stream = This.MEDIA_STREAMS[key];
             this.RTCSession.closeStream(stream)
         }
 
-        let pc = this.RTCSession.peerConnections['multiStreamPeer']
+        let pc = This.RTCSession.peerConnection
         // close peerConnection
         pc.getSenders().forEach(sender => {
             delete sender.track
             sender.replaceTrack(null)
         })
         pc.close()
-        this.RTCSession = null
+        This.RTCSession = null
     }catch (e) {
         log.error(e)
     }
@@ -156,17 +143,17 @@ GsRTC.prototype.closePeerConn = function () {
  * data.deviceId: given deviceId
  */
 GsRTC.prototype.shareAudio = function(data) {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('invalid RTCSession parameters! can not share audio')
         return
     }
 
     log.info('share local audio: ' + data.deviceId)
-    let This = this
     let type = 'audio'
-    let stream = this.RTCSession.getStream(type, true)
+    let stream = This.RTCSession.getStream(type, true)
     if(stream){
-        this.RTCSession.streamMuteSwitch({stream: stream, type: type, mute: false})
+        This.RTCSession.streamMuteSwitch({stream: stream, type: type, mute: false})
     }else {
         log.info('getting new stream')
         async function getMediaCallBack(args){
@@ -174,7 +161,7 @@ GsRTC.prototype.shareAudio = function(data) {
                 let stream = args.stream
                 log.info('get stream: ' +  stream ? stream.id : null)
                 This.RTCSession.setStream(stream, type, true)
-                let pc = This.RTCSession.peerConnections['multiStreamPeer']
+                let pc = This.RTCSession.peerConnection
                 This.RTCSession.processAddStream(stream, pc, type)
                 await This.RTCSession.doOffer(pc)
             }else if(args.error){
@@ -189,9 +176,9 @@ GsRTC.prototype.shareAudio = function(data) {
             video: false
         }
 
-        this.action = 'audioRefresh'
-        this.on('audioRefresh', data.callback)
-        this.device.getMedia(conf, constraints)
+        This.action = 'audioRefresh'
+        This.on('audioRefresh', data.callback)
+        This.device.getMedia(conf, constraints)
     }
 }
 
@@ -202,15 +189,15 @@ GsRTC.prototype.shareAudio = function(data) {
  * data.deviceId
  */
 GsRTC.prototype.switchAudioSource = function(data) {
+    let This = this
     log.info('switch audio source: ' + data.deviceId)
     if(!this.RTCSession){
         log.error('switchAudioSource: invalid RTCSession parameters!')
         return
     }
-    let This = this
     let type = data.type
-    let previousStream = this.RTCSession.getStream(type, true)
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let previousStream = This.RTCSession.getStream(type, true)
+    let pc = This.RTCSession.peerConnection
 
     async function getMediaCallBack(event){
         if(event.stream){
@@ -238,9 +225,9 @@ GsRTC.prototype.switchAudioSource = function(data) {
         video: false
     }
 
-    this.action = 'switchAudioSource'
-    this.on('switchAudioSource', data.callback)
-    this.device.getMedia(conf, constraints)
+    This.action = 'switchAudioSource'
+    This.on('switchAudioSource', data.callback)
+    This.device.getMedia(conf, constraints)
 }
 
 /**
@@ -248,6 +235,7 @@ GsRTC.prototype.switchAudioSource = function(data) {
  * @param data: callback
  */
 GsRTC.prototype.stopShareAudio = function(data) {
+    let This = this
     if(!this.RTCSession){
         log.error('stopShareAudio: invalid RTCSession parameters! ')
         return
@@ -255,9 +243,9 @@ GsRTC.prototype.stopShareAudio = function(data) {
 
     try {
         let type = data.type
-        let stream = this.RTCSession.getStream(type, true)
+        let stream = This.RTCSession.getStream(type, true)
         if(stream){
-            this.RTCSession.streamMuteSwitch({stream: stream, type: type, mute: true})
+            This.RTCSession.streamMuteSwitch({stream: stream, type: type, mute: true})
         }else {
             log.info('Audio stream: null')
         }
@@ -275,15 +263,15 @@ GsRTC.prototype.stopShareAudio = function(data) {
  * data.deviceId
  */
 GsRTC.prototype.shareVideo = function(data) {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('shareVideo: invalid RTCSession parameters! ')
         return
     }
 
-    let This = this
     let type = 'main'
     let previousStream = This.RTCSession.getStream(type, true)
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let pc = This.RTCSession.peerConnection
 
     let param = {
         streamType: 'video',
@@ -292,7 +280,7 @@ GsRTC.prototype.shareVideo = function(data) {
         width: 640,
         height: 360,
     }
-    let constraints = this.device.getConstraints(param)
+    let constraints = This.device.getConstraints(param)
 
     function getMediaCallBack(event){
         if(event.stream){
@@ -323,9 +311,9 @@ GsRTC.prototype.shareVideo = function(data) {
     }
 
     let gumData = { streamType: 'video', callback: getMediaCallBack }
-    this.action = 'shareVideo'
-    this.on('shareVideo', data.callback)
-    this.device.getMedia(gumData, constraints)
+    This.action = 'shareVideo'
+    This.on('shareVideo', data.callback)
+    This.device.getMedia(gumData, constraints)
 }
 
 /**
@@ -333,25 +321,26 @@ GsRTC.prototype.shareVideo = function(data) {
  * @param callback 回调函数
  */
 GsRTC.prototype.stopShareVideo = function(callback) {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('stopShareVideo: invalid RTCSession parameters! ')
         return
     }
 
     let type = 'main'
-    let stream = this.RTCSession.getStream(type, true)
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let stream = This.RTCSession.getStream(type, true)
+    let pc = This.RTCSession.peerConnection
 
     if(stream){
-        this.action = 'stopShareVideo'
-        this.on('stopShareVideo', callback)
+        This.action = 'stopShareVideo'
+        This.on('stopShareVideo', callback)
 
         log.info('clear previous stream')
-        this.RTCSession.deviceId = null
-        this.RTCSession.processRemoveStream(stream, pc, type)
-        this.RTCSession.closeStream(stream)
-        this.RTCSession.setStream(null, type, true)
-        this.RTCSession.doOffer(pc)
+        This.RTCSession.deviceId = null
+        This.RTCSession.processRemoveStream(stream, pc, type)
+        This.RTCSession.closeStream(stream)
+        This.RTCSession.setStream(null, type, true)
+        This.RTCSession.doOffer(pc)
     }else {
         throw new Error("ERR_INVALID_PARAMETER_VALUE: VIDEO STREAM IS NULL");
     }
@@ -364,17 +353,17 @@ GsRTC.prototype.stopShareVideo = function(callback) {
  * data.callback
  */
 GsRTC.prototype.shareScreen = function(data) {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('shareScreen: invalid RTCSession parameters! ')
         return
     }
 
-    let This = this
     let type = 'slides'
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let pc = this.RTCSession.peerConnection
 
-    this.action = 'shareScreen'
-    this.on('shareScreen', data.callback)
+    This.action = 'shareScreen'
+    This.on('shareScreen', data.callback)
 
     function getMediaCallBack(event){
         if(event.stream){
@@ -382,7 +371,7 @@ GsRTC.prototype.shareScreen = function(data) {
             let stream = event.stream
             stream.oninactive= function () {
                 log.warn("user clicks the bottom share bar to stop sharing")
-                stopShareScreen()
+                stopScreen()
             }
 
             This.RTCSession.setStream(stream, type, true)
@@ -394,7 +383,7 @@ GsRTC.prototype.shareScreen = function(data) {
         }
     }
     let gumData = {streamType: 'screenShare', callback: getMediaCallBack}
-    this.device.getMedia(gumData, data.constraints)
+    This.device.getMedia(gumData, data.constraints)
 }
 
 /**
@@ -403,25 +392,25 @@ GsRTC.prototype.shareScreen = function(data) {
  * @param data.callback 回调函数
  */
 GsRTC.prototype.switchScreenSource = function(data) {
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('switchScreenSource: invalid RTCSession parameters! ')
         return
     }
 
-    let This = this
     let type = 'slides'
     let previousStream = This.RTCSession.getStream(type, true)
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let pc = This.RTCSession.peerConnection
 
-    this.action = 'switchScreenSource'
-    this.on('switchScreenSource', data.callback)
+    This.action = 'switchScreenSource'
+    This.on('switchScreenSource', data.callback)
 
     function getMediaCallBack(event){
         if(event.stream){
             let stream = event.stream
             stream.oninactive = function () {
                 log.warn("user clicks the bottom share bar to stop sharing.")
-                stopShareScreen()
+                stopScreen()
             }
 
             if(previousStream && This.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
@@ -446,7 +435,7 @@ GsRTC.prototype.switchScreenSource = function(data) {
         streamType: 'screenShare',
         callback: getMediaCallBack
     }
-    this.device.getMedia(gumData, data.constraints)
+    This.device.getMedia(gumData, data.constraints)
 }
 
 /**
@@ -454,24 +443,25 @@ GsRTC.prototype.switchScreenSource = function(data) {
  * @param data
  */
 GsRTC.prototype.stopShareScreen = function(data) {
+    let This = this
     if(!this.RTCSession){
         log.error('stopShareScreen: invalid RTCSession parameters! ')
         return
     }
 
     let type = 'slides'
-    let stream = this.RTCSession.getStream(type, true)
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let stream = This.RTCSession.getStream(type, true)
+    let pc = This.RTCSession.peerConnection
 
     if(stream){
-        this.action = 'stopShareScreen'
-        this.on('stopShareScreen', data.callback)
+        This.action = 'stopShareScreen'
+        This.on('stopShareScreen', data.callback)
 
         log.info('clear previous stream')
-        this.RTCSession.processRemoveStream(stream, pc, type)
-        this.RTCSession.closeStream(stream)
-        this.RTCSession.setStream(null, type, true)
-        this.RTCSession.doOffer(pc)
+        This.RTCSession.processRemoveStream(stream, pc, type)
+        This.RTCSession.closeStream(stream)
+        This.RTCSession.setStream(null, type, true)
+        This.RTCSession.doOffer(pc)
     }
 }
 
@@ -482,11 +472,12 @@ GsRTC.prototype.stopShareScreen = function(data) {
  */
 GsRTC.prototype.sendDtmf = function(data){
     log.info('send dtmf digit:  ' + data.digit)
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('sendDtmf: invalid RTCSession parameters!')
         return
     }
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
+    let pc = This.RTCSession.peerConnection
 
     let dtmfSender
     if(pc.getSenders){
@@ -515,7 +506,8 @@ GsRTC.prototype.sendDtmf = function(data){
  * @param data
  */
 GsRTC.prototype.adjustResolution = function(data){
-    if(!this.RTCSession){
+    let This = this
+    if(!This.RTCSession){
         log.error('adjustResolution: invalid RTCSession parameters!')
         return
     }
@@ -525,12 +517,11 @@ GsRTC.prototype.adjustResolution = function(data){
     }
     log.info('adjust down resolution:  ' + data.height)
 
-    let pc = this.RTCSession.peerConnections['multiStreamPeer']
-    this.action = 'adjustResolution'
-    this.on('adjustResolution', data.callback)
-    this.setVideoResolution(this.getResolutionByHeight(data.height), 'EXPECT_RECV_RESOLUTION')
-
-    this.RTCSession.doOffer(pc)
+    let pc = This.RTCSession.peerConnection
+    This.action = 'adjustResolution'
+    This.on('adjustResolution', data.callback)
+    This.setVideoResolution(This.getResolutionByHeight(data.height), 'EXPECT_RECV_RESOLUTION')
+    This.RTCSession.doOffer(pc)
 }
 
 

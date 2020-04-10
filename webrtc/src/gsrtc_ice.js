@@ -85,15 +85,12 @@ PeerConnection.prototype.onIceRestartFailed = function (pc) {
     pc.iceFailureNum = 0
     pc.isIceFailed = true
     log.info('close peer')
-    for (let key in this.RTCSession.peerConnections) {
-        let pc = this.RTCSession.peerConnections[key];
-        // close peerConnection
-        pc.getSenders().forEach(sender => {
-            delete sender.track
-            sender.replaceTrack(null)
-        })
-        pc.close()
-    }
+    // close peerConnection
+    pc.getSenders().forEach(sender => {
+        delete sender.track
+        sender.replaceTrack(null)
+    })
+    pc.close()
 }
 
 PeerConnection.prototype.onIceCandidate = function (pc, event) {
@@ -112,7 +109,7 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
         return
     }
 
-    let pc = gsRTC.RTCSession.peerConnections['multiStreamPeer']
+    let pc = gsRTC.RTCSession.peerConnection
     if(pc.isLocalSdpPending === true){
         log.info('MyOnIceGatheringCompleted not ready( ' + pc.type + " )")
         return false;

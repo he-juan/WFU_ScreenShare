@@ -9,14 +9,13 @@ log.error = window.debug("GARTC_JSEP:ERROR");
 
 /**
  * create PeerConnection instance
- * @param config
  * @param gsRTC
  * @constructor
  */
-let PeerConnection = function (config, gsRTC) {
+let PeerConnection = function (gsRTC) {
     this.gsRTC = gsRTC
-    this.conf = config
-    this.peerConnections = []
+    this.conf = {}
+    this.peerConnection = null
 }
 
 /**
@@ -27,11 +26,10 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
     log.info('create webRTC multiStream Peer connection')
     try {
         let This = this
-        let sessionsConfig = conf.sessionsConfig ? conf.sessionsConfig : ['multiStreamPeer']
-        let type = sessionsConfig[0]
+        let type = 'multiStreamPeer'
 
-        this.peerConnections[type] = This.createPeerConnection(type, conf)
-        let pc = this.peerConnections[type]
+        this.peerConnection = This.createPeerConnection(type, conf)
+        let pc = This.peerConnection
 
         if(RTCPeerConnection.prototype.addTransceiver){
             log.info('use addTransceiver to add transceiver ');
@@ -101,7 +99,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     let pc
     let config = {iceTransportPolicy: 'all'}
     let iceservers = conf.iceServer;
-    let RTCpeerConnectionOptional = this.conf.RTCpeerConnectionOptional;
+    let RTCpeerConnectionOptional = This.conf.RTCpeerConnectionOptional;
     // chrome 72 版本默认unified-plan， 65版本开始unified-plan为实验性质标志，通过sdpSemantics: unified-plan 启用
     if (RTCpeerConnectionOptional === null || RTCpeerConnectionOptional === undefined) {
         RTCpeerConnectionOptional = { optional: [ { 'pcName': "PC_" + type + "_" + Math.random().toString(36).substr(2) }, { 'googDscp': true }, { 'googIPv6': false } ] };
@@ -131,7 +129,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     pc.iceFailureNum = 0
     pc.isIceFailed = false
     pc.isLocalSdpPending = true;
-    this.subscribeStreamEvents(pc)
+    This.subscribeStreamEvents(pc)
 
     // 服务器回复的200 ok中，audio默认 sendrecv，不添加流的话会报错："Answer tried to set recv when offer did not set send"
     if(!This.gsRTC.MEDIA_STREAMS.LOCAL_AUDIO_STREAM){
@@ -151,7 +149,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
             }
             let conf = { streamType: 'audio', callback: getMediaCallBack }
             let constraints =  { audio: true, video: false, fake: true }
-            this.gsRTC.device.getMedia(conf, constraints)
+            This.gsRTC.device.getMedia(conf, constraints)
         }
     }
 
@@ -185,7 +183,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
  */
 PeerConnection.prototype.doOffer = async function (pc) {
     let This = this
-    this.gsRTC.isProcessingInvite = true
+    This.gsRTC.isProcessingInvite = true
     log.info("create sdp( PC: " + pc.type + " )");
     // Added checks to ensure that connection object is defined first
     if (!pc) {
@@ -304,11 +302,10 @@ PeerConnection.prototype.onCreateLocalDescriptionError = function (error) {
 PeerConnection.prototype.setRemote = async function (sdp) {
     let This = this
     try {
-        let pc = gsRTC.RTCSession.peerConnections['multiStreamPeer']
+        let pc = gsRTC.RTCSession.peerConnection
         log.info('setRemoteDescription (' + pc.type + ')')
-        let roSdp = This.gsRTC.getSdpByType(pc.type, sdp)
         log.info('onSignalingStateChange type: ' + pc.type + ', signalingState: ' + pc.signalingState)
-        let desc = new window.RTCSessionDescription({type: 'answer', sdp: roSdp})
+        let desc = new window.RTCSessionDescription({type: 'answer', sdp: sdp})
         await pc.setRemoteDescription(desc)
         This.setRemoteDescriptionSuccess(pc)
     } catch (e) {
@@ -321,21 +318,9 @@ PeerConnection.prototype.setRemote = async function (sdp) {
  * @param pc
  */
 PeerConnection.prototype.setRemoteDescriptionSuccess = function (pc) {
+    let This = this
     log.info('setRemoteDescription success ( ' + pc.type + ')')
-    this.gsRTC.inviteProcessing = false
-
-    let sendPermission
-    if(window.isPresentShare || window.isMainShare){
-        if(window.isPresentShare === true || window.isMainShare === true){
-            sendPermission = 1
-        }else if(window.isPresentShare === 'stop' || window.isMainShare === 'stop'){
-            sendPermission = 0
-        }
-        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: sendPermission})
-    }
-
-    window.isMainShare = false
-    window.isPresentShare = false
+    This.gsRTC.sokect.handleSharingSignal()
 }
 
 /**

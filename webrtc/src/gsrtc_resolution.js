@@ -15,55 +15,43 @@ GsRTC.prototype.getSdpByType = function (type, sdp) {
     let parseSdp
     let mid
 
-    // 这里setRemote 之前修改一下mid
-    if(this.enableMultiStream === true){
-        log.info('get multi stream sdp')
-        result = sdp
-    }else {
-        let sdpArray = SDPTools.splitSDP(sdp);
-        for(let i = 0; i<sdpArray.length; i++) {
-            if (type === 'audio' && sdpArray[i].indexOf('m=audio') >= 0) {
-                result = sdpArray[i]
-                mid = This.MID_OBJ.AUDIO_MID.ORIGINAL_MID
+    let sdpArray = SDPTools.splitSDP(sdp);
+    for(let i = 0; i<sdpArray.length; i++) {
+        if (type === 'audio' && sdpArray[i].indexOf('m=audio') >= 0) {
+            result = sdpArray[i]
+            mid = This.MID_OBJ.AUDIO_MID.ORIGINAL_MID
             // video1 for wfu
-            } else if ((type === 'main' || type === 'video1') && sdpArray[i].indexOf('a=content:main') >= 0) {
-                result = sdpArray[i]
-                mid = This.MID_OBJ.MAIN_MID.ORIGINAL_MID
-            } else if( (type === 'slides') && sdpArray[i].indexOf('a=content:slides') >= 0) {
-                mid = This.MID_OBJ.SLIDES_MID.ORIGINAL_MID
-                result = sdpArray[i]
-            }
+        } else if ((type === 'main' || type === 'video1') && sdpArray[i].indexOf('a=content:main') >= 0) {
+            result = sdpArray[i]
+            mid = This.MID_OBJ.MAIN_MID.ORIGINAL_MID
+        } else if( (type === 'slides') && sdpArray[i].indexOf('a=content:slides') >= 0) {
+            mid = This.MID_OBJ.SLIDES_MID.ORIGINAL_MID
+            result = sdpArray[i]
+        }
 
-            if(result){
-                parseSdp = SDPTools.parseSDP(result)
-                parseSdp = This.modifiedMidOfSdp(parseSdp, mid)
-                result = SDPTools.writeSDP(parseSdp)
-            }
+        if(result){
+            parseSdp = SDPTools.parseSDP(result)
+            parseSdp = This.modifiedMidOfSdp(parseSdp, mid)
+            result = SDPTools.writeSDP(parseSdp)
         }
     }
+
     return result
 }
 
 /**
  * set sdp session version
- * @param localSdp
+ * @param sdp
  */
-GsRTC.prototype.saveSDPSessionVersion = function (localSdp) {
+GsRTC.prototype.saveSDPSessionVersion = function (sdp) {
     log.info('set local sdp session version value')
-    if(!localSdp){
+    if(!sdp){
         log.warn('invalid parameters local sdp!')
         return
     }
 
-    let This = this
-    let parseSdp = SDPTools.parseSDP(localSdp)
-
-    if(This.isSendReInvite){
-        parseSdp.origin.sessionVersion = This.sessionVersion + 1
-        This.sessionVersion = parseSdp.origin.sessionVersion
-    }else {
-        This.sessionVersion = parseSdp.origin.sessionVersion
-    }
+    let parseSdp = SDPTools.parseSDP(sdp)
+    this.sessionVersion = parseSdp.origin.sessionVersion
 }
 
 /**
