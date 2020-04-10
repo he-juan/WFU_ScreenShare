@@ -40,7 +40,7 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
         }else {
             log.info('use captureStream to add transceiver ');
             // get two video stream
-            let streamArray = this.getCaptureStream(2)
+            let streamArray = This.getCaptureStream(2)
             for(let i = 0; i<streamArray.length; i++){
                 let stream = streamArray[i]
                 log.info('add stream to peerConnection: ' + stream.id)

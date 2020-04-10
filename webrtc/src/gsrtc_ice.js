@@ -105,7 +105,8 @@ PeerConnection.prototype.onIceCandidate = function (pc, event) {
 }
 
 PeerConnection.prototype.onIceGatheringCompleted = function () {
-    if(!this.gsRTC.isProcessingInvite){
+    let This = this
+    if(!This.gsRTC.isProcessingInvite){
         return
     }
 
@@ -116,8 +117,14 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
     }
     log.warn("__MyOnIceGatheringCompleted be ready to send INVITE or 200OK");
 
-    this.gsRTC.isProcessingInvite = false
-    this.gsRTC.eventStack({type: 'GET_LO_SUCCESS'})
+    This.gsRTC.isProcessingInvite = false
+    let sdp = This.decorateLocalSDP()
+    This.gsRTC.saveSDPSessionVersion(sdp)
+    let data = {
+        type: gsRTC.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
+        sdp: sdp
+    }
+    This.gsRTC.sokect.sendMessage(data)
 }
 
 

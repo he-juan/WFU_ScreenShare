@@ -19,23 +19,7 @@ GsRTC.prototype.eventBindings = function(){
  * @param event
  */
 GsRTC.prototype.eventStack = function(event){
-    let This = this
-    switch (event.type) {
-        case 'GET_LO_SUCCESS':
-            let sdp = This.RTCSession.decorateLocalSDP()
-            // Save the session version, plus one for each re-invite
-            this.saveSDPSessionVersion(sdp)
 
-            let data = {
-                type: gsRTC.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
-                sdp: sdp
-            }
-            This.sokect.sendMessage(data)
-            break
-        default:
-            log.info('eventStack null: ', event.type)
-            break
-    }
 }
 
 

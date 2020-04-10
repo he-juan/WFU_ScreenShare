@@ -72,31 +72,33 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
  * @param message
  */
 WebSocketInstance.prototype.handleIncomingMessage = function(message){
+    let code = null
     let messageObj = JSON.parse(message)
     let action = Object.keys(messageObj)[0]
     log.info('handleIncomingMessage of: ' + action)
-    let code = null
-    if(messageObj.errorInfo){
-        code = messageObj.errorInfo.errorId;
+    let data = messageObj[action]
+    if(data.errorInfo){
+        code = data.errorInfo.errorId;
     }
+    log.info('get code: ' + code)
 
     switch (action) {
         case gsRTC.SIGNAL_EVENT_TYPE.INVITE_RET.name:
         case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE_RET.name:
             // gs_phone的主动呼叫和主动更新会话信息，目前没有实现，但是需要考虑
             if(gsRTC.isNxx(2, code)){
-                let sdp = messageObj.sdp.data
+                let sdp = data.sdp.data
                 gsRTC.RTCSession.handleRemoteSDP(sdp)
             }else if(gsRTC.isNxx(4, code)){
-                log.error(code + ', ' + messageObj.errorInfo.message)
+                log.error(code + ', ' + data.errorInfo.message)
             }
             break;
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT.name:
             // gs_phone请求开演示
-            if(messageObj.sendPermission === 2){
+            if(data.sendPermission === 2){
                 log.warn('receive request to turn off desktop sharing')
                 stopScreen()
-            }else if(messageObj.sendPermission === 3){
+            }else if(data.sendPermission === 3){
                 log.warn('receive request to turn on desktop sharing')
                 beginScreen()
             }
@@ -106,7 +108,7 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 log.info('present on request success')
             }else if(gsRTC.isNxx(4, code)){
                 log.warn('present on request error')
-                log.error('present on request error: ' + messageObj.errorInfo.message)
+                log.error('present on request error: ' + data.errorInfo.message)
             }
             break
         case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE.name:

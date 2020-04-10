@@ -54,6 +54,8 @@
 
 1、开演示发送 updateMediaSession 和 ctrlPresentation，并处理成功后，遇到ice failed，再次重新updateMediaSession，没有发送ctrlPresentation，此时gs_phone不显示演示流
 
+2、使用captureStream创建三个m行时，audio会在最后面，sdp处理就会出现错误
+
 
 
 
