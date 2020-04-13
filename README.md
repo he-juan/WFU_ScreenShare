@@ -96,12 +96,23 @@ a=group:BUNDLE 2
 
 - 根据编解码名称去除对应编解码[done]
 
+
+
+### mid 说明
+
+- offer answer中每个m行的mid需对应，例如：offer audio mid=0，answer audio mid=0
+- offer answer中每个m行顺序需要一致，如offer audio为第一个m行，answer中的audio也需要在第一个m行
+- 需要保存一开始offer中。各个m行的顺序
+
+
 - Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
 Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.
 
 处理：收到sdp后，设置时，要修改mid为原来的值
 
 
+- Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
+Failed to set remote offer sdp: The order of m-lines in subsequent offer doesn't match order from previous offer/answer.
 
 
 

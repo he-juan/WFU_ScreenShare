@@ -31,13 +31,13 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
         this.peerConnection = This.createPeerConnection(type, conf)
         let pc = This.peerConnection
 
-        // if(RTCPeerConnection.prototype.addTransceiver){
-        //     log.info('use addTransceiver to add transceiver ');
-        //     // add audio Transceiver to keep audio media first
-        //     pc.addTransceiver('audio')
-        //     pc.addTransceiver('video')
-        //     pc.addTransceiver('video')
-        // }else {
+        if(RTCPeerConnection.prototype.addTransceiver){
+            log.info('use addTransceiver to add transceiver ');
+            // add audio Transceiver to keep audio media first
+            pc.addTransceiver('audio')
+            pc.addTransceiver('video')
+            pc.addTransceiver('video')
+        }else {
             log.info('use captureStream to add transceiver ');
             // get two video stream
             let streamArray = This.getCaptureStream(2)
@@ -46,7 +46,7 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
                 log.info('add stream to peerConnection: ' + stream.id)
                 pc.addStream(stream)
             }
-        // }
+        }
 
         This.doOffer(pc)
     }catch (e) {
@@ -305,6 +305,7 @@ PeerConnection.prototype.setRemote = async function (sdp) {
         let pc = gsRTC.RTCSession.peerConnection
         log.info('setRemoteDescription (' + pc.type + ')')
         log.info('onSignalingStateChange type: ' + pc.type + ', signalingState: ' + pc.signalingState)
+        log.info('setRemote sdp:\n' + sdp)
         let desc = new window.RTCSessionDescription({type: 'answer', sdp: sdp})
         await pc.setRemoteDescription(desc)
         This.setRemoteDescriptionSuccess(pc)

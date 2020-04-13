@@ -1,45 +1,5 @@
 
 /**
- * get sdp by type
- * @param type
- * @param sdp
- * @returns {*}
- */
-GsRTC.prototype.getSdpByType = function (type, sdp) {
-    if(!type || !sdp){
-        log.warn('invalid parameters remote sdp or type!')
-        return
-    }
-    let This = this
-    let result = null
-    let parseSdp
-    let mid
-
-    let sdpArray = SDPTools.splitSDP(sdp);
-    for(let i = 0; i<sdpArray.length; i++) {
-        if (type === 'audio' && sdpArray[i].indexOf('m=audio') >= 0) {
-            result = sdpArray[i]
-            mid = This.MID_OBJ.AUDIO_MID.ORIGINAL_MID
-            // video1 for wfu
-        } else if ((type === 'main' || type === 'video1') && sdpArray[i].indexOf('a=content:main') >= 0) {
-            result = sdpArray[i]
-            mid = This.MID_OBJ.MAIN_MID.ORIGINAL_MID
-        } else if( (type === 'slides') && sdpArray[i].indexOf('a=content:slides') >= 0) {
-            mid = This.MID_OBJ.SLIDES_MID.ORIGINAL_MID
-            result = sdpArray[i]
-        }
-
-        if(result){
-            parseSdp = SDPTools.parseSDP(result)
-            parseSdp = This.modifiedMidOfSdp(parseSdp, mid)
-            result = SDPTools.writeSDP(parseSdp)
-        }
-    }
-
-    return result
-}
-
-/**
  * set sdp session version
  * @param sdp
  */

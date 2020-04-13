@@ -504,46 +504,30 @@ GsRTC.prototype.removeLevel = function(sdp){
 }
 
 /**
- * modified mid of sdp
- * @param sdp
- * @param mid
- * @returns {*}
- */
-GsRTC.prototype.modifiedMidOfSdp = function(sdp, mid){
-    log.info('modified mid of sdp')
-    if(sdp.media && sdp.media[0]){
-        sdp.media[0].mid = mid
-    }
-
-    return sdp
-}
-
-/**
  * save original and modified mid before send invites
- * @param sdp
- * @param type
+ * @param type 类型
+ * @param mid 原本的mid
  */
-GsRTC.prototype.saveMidBeforeSendInvite = function(sdp, type){
+GsRTC.prototype.saveMid = function(type, mid){
     log.info('save mid')
     let This = this
-    let mid
-    let parseSDP = SDPTools.parseSDP(sdp)
-    if(parseSDP.media && parseSDP.media[0] && parseSDP.media[0]){
-        mid = parseSDP.media[0].mid
-    }
 
     switch (type) {
         case 'audio':
             This.MID_OBJ.AUDIO_MID.ORIGINAL_MID = mid
-            This.MID_OBJ.AUDIO_MID.MODIFIED_MID = 0
+            This.MID_OBJ.AUDIO_MID.MODIFIED_MID = This.getModifiedMid(type)
             break
         case 'main':
             This.MID_OBJ.MAIN_MID.ORIGINAL_MID = mid
-            This.MID_OBJ.MAIN_MID.MODIFIED_MID = 1
+            This.MID_OBJ.MAIN_MID.MODIFIED_MID = This.getModifiedMid(type)
             break
         case 'slides':
             This.MID_OBJ.SLIDES_MID.ORIGINAL_MID = mid
-            This.MID_OBJ.SLIDES_MID.MODIFIED_MID = 2
+            This.MID_OBJ.SLIDES_MID.MODIFIED_MID = This.getModifiedMid(type)
+            break
+        case 'gui':
+            This.MID_OBJ.GUI_MID.ORIGINAL_MID = mid
+            This.MID_OBJ.GUI_MID.MODIFIED_MID = This.getModifiedMid(type)
             break
         default:
             break
@@ -564,6 +548,29 @@ GsRTC.prototype.getModifiedMid = function(type){
         mid = This.MID_OBJ.MAIN_MID.MODIFIED_MID ? This.MID_OBJ.MAIN_MID.MODIFIED_MID : 1;
     }else if(type === "slides"){
         mid = This.MID_OBJ.SLIDES_MID.MODIFIED_MID ? This.MID_OBJ.SLIDES_MID.MODIFIED_MID : 2;
+    }else if(type === "gui"){
+        mid = This.MID_OBJ.GUI_MID.MODIFIED_MID ? This.MID_OBJ.GUI_MID.MODIFIED_MID : 3;
+    }
+    log.info('get ' + type + ' mid of ' + mid)
+    return mid;
+}
+
+/**
+ * 获取原本的mid
+ * @param type
+ * @returns {*}
+ */
+GsRTC.prototype.getOriginalMid = function(type){
+    let This = this
+    let mid;
+    if(type === "audio"){
+        mid = This.MID_OBJ.AUDIO_MID.ORIGINAL_MID
+    }else if(type === "main"){
+        mid = This.MID_OBJ.MAIN_MID.ORIGINAL_MID
+    }else if(type === "slides"){
+        mid = This.MID_OBJ.SLIDES_MID.ORIGINAL_MID
+    }else if(type === "gui"){
+        mid = This.MID_OBJ.GUI_MID.ORIGINAL_MID
     }
     log.info('get ' + type + ' mid of ' + mid)
     return mid;
@@ -632,22 +639,30 @@ GsRTC.prototype.adjustOrderOfMLines = function (sdp) {
     let audioArray
     let videoArray = []
     let videoMid = 1
+    let type = ''
+    let originalMid
     parseSDP.msidSemantics = []
     parseSDP.groups = [{type: "BUNDLE", mids: 0}]
 
     for(let i=0; i< parseSDP.media.length; i++){
+        originalMid = parseSDP.media[i].mid
         if(parseSDP.media[i].type === 'audio'){
-            parseSDP.media[i].mid = 0
+            type = 'audio'
+            parseSDP.media[i].mid = This.getModifiedMid('audio')
             audioArray = parseSDP.media[i]
         }else {
+            type = This.getTypeByMid(videoMid)
             parseSDP.media[i].mid = videoMid
-            parseSDP.media[i].content = This.getTypeByMid(parseSDP.media[i].mid)
+            parseSDP.media[i].content = type
             parseSDP.groups.push({type: "BUNDLE", mids: parseSDP.media[i].mid})
             videoArray.push(parseSDP.media[i])
             videoMid ++
         }
         parseSDP.msidSemantics.push( {semantic: "", token: "WMS"})
+        This.saveMid(type, originalMid)
+        This.mLineOrder.push(type)
     }
+    This.mLineOrder = [...new Set(This.mLineOrder)];
     parseSDP.media = [audioArray]
     parseSDP.media = parseSDP.media.concat(videoArray)
     sdp = SDPTools.writeSDP(parseSDP)
@@ -672,6 +687,7 @@ GsRTC.prototype.removeSSRC = function (sdp) {
             log.info('deleted stream info')
             delete parseSDP.media[i].ssrcGroups
             delete parseSDP.media[i].ssrcs
+            parseSDP.media[i].direction = 'recvonly'
         }
     }
     sdp = SDPTools.writeSDP(parseSDP)
@@ -687,7 +703,7 @@ GsRTC.prototype.removeSSRC = function (sdp) {
 GsRTC.prototype.removeCodeByName = function (sdp) {
     log.info('remove ssrc')
     let lines = sdp.split('\n')
-    let removePayloads = [0, 8, 106, 105, 13, 110, 112, 113, 98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116]
+    let removePayloads = [106, 105, 13, 110, 112, 113, 98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116]
 
     function getMLinePosition(lines){
         // 获取所有m行的位置

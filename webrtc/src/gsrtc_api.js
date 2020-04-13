@@ -23,6 +23,7 @@ let GsRTC = function (options) {
     this.isSendReInvite = false            // 判断是否为re-invite
     this.isNonInviteSignalNeed = false     // 标记是否发送非invite信令，如ctrlPresentation
     this.sharingPermission = 0             // 标记共享命令：1开启 0关闭
+    this.mLineOrder = []                   // 记录m行的顺序
 
     this.device = new MediaDevice()
     this.eventBindings()

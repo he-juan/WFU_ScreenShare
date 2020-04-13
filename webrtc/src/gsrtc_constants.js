@@ -46,6 +46,10 @@ GsRTC.prototype.MID_OBJ = {
         ORIGINAL_MID: null,
         MODIFIED_MID: null
     },
+    GUI_MID: {
+        ORIGINAL_MID: null,
+        MODIFIED_MID: null
+    }
 }
 
 GsRTC.prototype.SIGNAL_EVENT_TYPE = {

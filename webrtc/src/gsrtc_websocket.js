@@ -180,10 +180,10 @@ WebSocketInstance.prototype.sendMessage = function (data) {
         // 开演示或关演示
         info.sendPermission = data.permission.value
         log.info('send present control message: \n' + JSON.stringify(info))
-    }else if(data.messageContent){
+    }else if(data.message){
         // 发送message消息
-        Object.keys(content).forEach(function(index) {
-            info[index] = content[index]
+        Object.keys(data.message).forEach(function(index) {
+            info[index] = data.message[index]
         });
         log.info('send message')
     }else if(data.userInfo){

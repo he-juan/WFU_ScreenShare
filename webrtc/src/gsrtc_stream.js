@@ -318,31 +318,6 @@ PeerConnection.prototype.streamMuteSwitch = function(data){
     }
 }
 
-/**
- * get transceiver mid main for multiStream
- * @param pc
- * @param type
- * @returns {*}
- */
-PeerConnection.prototype.getTransceiverMid = function(pc, type){
-    log.info('get transceiver')
-    let mid = 0
-
-    if(pc.getTransceivers){
-        if(type && pc.getTransceivers().length > 0){
-            let transceiver = pc.getTransceivers()
-            for(let i = 0; i<transceiver.length; i++){
-                if((type === 'audio' && transceiver[i].mid === '0') || (type === 'main' && transceiver[i].mid === '1') || (type === 'slides' && transceiver[i].mid === '2') /*|| (type === 'gui' && transceiver[i].mid === '3')*/) {
-                    mid = i
-                    log.info('get transceiver mid:' + mid)
-                }
-            }
-        }
-    }
-
-    return mid
-}
-
 /***
  * Function that add stream
  * @param stream
@@ -353,7 +328,7 @@ PeerConnection.prototype.processAddStream = function (stream, pc, type) {
     log.info('process add stream')
     let This = this
 
-    let mid =  This.getTransceiverMid(pc, type)
+    let mid =  This.gsRTC.getOriginalMid(type)
     if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */
@@ -375,7 +350,7 @@ PeerConnection.prototype.processAddStream = function (stream, pc, type) {
         }
     }else {
         /** see bug 137445 for safari 11.0.2 and 11.1.2 * */
-        let browserDetail = this.gsRTC.getBrowserDetail()
+        let browserDetail = This.gsRTC.getBrowserDetail()
         if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2") && pc.getSenders().length > 0){
             pc.getSenders()[mid].replaceTrack(stream.getTracks()[0])
                 .then(function () {
@@ -401,7 +376,7 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
     let This = this
     log.info('process remove stream')
 
-    let mid =  This.getTransceiverMid(pc, type)
+    let mid =  This.gsRTC.getOriginalMid(type)
     if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */
@@ -422,7 +397,7 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
         }
     }else {
         /** see bug 137445 for safari 11.0.2 and 11.1.2 * */
-        let browserDetail = this.gsRTC.getBrowserDetail()
+        let browserDetail = This.gsRTC.getBrowserDetail()
         if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2") && pc.getSenders().length > 0){
             pc.getSenders()[mid].track.enabled = false;
         }else if(stream){
