@@ -97,10 +97,10 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
             // gs_phone请求开演示
             if(data.sendPermission === 2){
                 log.warn('receive request to turn off desktop sharing')
-                stopScreen()
+                gsRTC.serverAction = 'presentTurnOffRequest'
             }else if(data.sendPermission === 3){
                 log.warn('receive request to turn on desktop sharing')
-                beginScreen()
+                gsRTC.serverAction = 'presentTurnOnRequest'
             }
             break
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET.name:
@@ -142,14 +142,23 @@ WebSocketInstance.prototype.handleSharingSignal = function(){
     let This = this
     log.info('handle signal')
     if(gsRTC.isNonInviteSignalNeed){
-        let permission = {
-            value: gsRTC.sharingPermission
-        }
-        log.info('prepare send control signal: ' + permission.value)
-        This.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission})
+        if(This.serverAction){
+            let errorInfo = {
+                errorId: 200,
+                message: 'Request success!'
+            }
+            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+            This.serverAction = null
+        }else {
+            let permission = {
+                value: gsRTC.sharingPermission
+            }
+            log.info('prepare send control signal: ' + permission.value)
+            This.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission})
 
-        gsRTC.isNonInviteSignalNeed = false
-        gsRTC.sharingPermission = gsRTC.sharingPermission ? 0 : 1
+            gsRTC.isNonInviteSignalNeed = false
+            gsRTC.sharingPermission = gsRTC.sharingPermission ? 0 : 1
+        }
     }
 }
 
@@ -169,6 +178,7 @@ WebSocketInstance.prototype.sendMessage = function (data) {
         reqId: reqId,
     }
 
+    // 发送
     if(data.sdp){
         // invite 或 re-invite
         info.sdp = {
@@ -195,6 +205,11 @@ WebSocketInstance.prototype.sendMessage = function (data) {
         info.mid = data.mid
         info.candidates = data.candidates
         log.info('trickle-ice, send candidates')
+    }
+    // 回复消息
+    if(data.presentRet){
+        // gs_phone请求开启或关闭演示的回复信息
+        info.errorInfo = data.errorInfo
     }
 
     log.warn("ws send message ");

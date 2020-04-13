@@ -96,7 +96,11 @@ a=group:BUNDLE 2
 
 - 根据编解码名称去除对应编解码[done]
 
+- gs_phone请求关闭演示时，webRTC需要发送ctrlPresentationRet命令，告诉gs_phone请求是否成功 [待办]
+    + 关闭时需要通知页面端，得到页面端回复后，才能发送回复信令给gs_phone
+    + 超时未回复，默认为拒绝 ？？？
 
+- 回复信令的状态码如何定义？？[待办]
 
 ### mid 说明
 

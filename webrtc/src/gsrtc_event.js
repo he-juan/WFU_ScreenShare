@@ -7,11 +7,28 @@ log.error = window.debug("GSRTC_EVENT:ERROR");
 /*Log Debug End*/
 
 /**
+ * Open to upper-level event registration interface
+ * eventType：Event type
+ * handerFun：User-defined processing functions
+ */
+GsRTC.prototype.addSipEventHandler = function(eventType,handlerFun){
+    this.preInit();
+    if (window.gsRTC){
+        window.gsRTC.on(eventType,handlerFun);
+        window.gsRTC.handlerFuns[eventType] = handlerFun;
+    }else {
+        log.error("ERR_NOT_INITIALIZED: Engine not initialized yet. Please create gsRTC first");
+    }
+}
+
+/**
  * Event registration
  */
 GsRTC.prototype.eventBindings = function(){
     log.info('event binding.')
-    this.on('onEventStack', this.eventStack)
+    let This = this
+    this.on('onEventStack', This.eventStack)
+    this.on('serverPresentRequest', This.serverPresentRequest)
 }
 
 /**
@@ -20,6 +37,40 @@ GsRTC.prototype.eventBindings = function(){
  */
 GsRTC.prototype.eventStack = function(event){
 
+}
+
+
+GsRTC.prototype.serverPresentRequest = function (data) {
+    let This = this
+    log.warn('data: ', data)
+    switch (This.serverAction) {
+        case 'presentTurnOffRequest':
+            if(data.permission){
+                stopScreen()
+            }else {
+                let errorInfo = {
+                    errorId: 700,
+                    message: 'Present turn Off request denied'
+                }
+                This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+                This.serverAction = null
+            }
+            break;
+        case 'presentTurnOnRequest':
+            if(data.permission){
+                beginScreen()
+            }else {
+                let errorInfo = {
+                    errorId: 701,
+                    message: 'Present turn On Request denied'
+                }
+                This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+                This.serverAction = null
+            }
+            break
+        default:
+            break
+    }
 }
 
 

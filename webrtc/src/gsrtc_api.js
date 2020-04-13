@@ -24,6 +24,7 @@ let GsRTC = function (options) {
     this.isNonInviteSignalNeed = false     // 标记是否发送非invite信令，如ctrlPresentation
     this.sharingPermission = 0             // 标记共享命令：1开启 0关闭
     this.mLineOrder = []                   // 记录m行的顺序
+    this.serverAction = null
 
     this.device = new MediaDevice()
     this.eventBindings()
@@ -73,21 +74,6 @@ GsRTC.prototype.setHtmlMediaElement = function(args){
         this.HTML_MEDIA_ELEMENT.remoteVideoShare = args.remoteVideoShare
     }catch (e) {
         throw new Error(e);
-    }
-}
-
-/**
- * Open to upper-level event registration interface
- * eventType：Event type
- * handerFun：User-defined processing functions
- */
-GsRTC.prototype.addSipEventHandler = function(eventType,handlerFun){
-    this.preInit();
-    if (window.gsRTC){
-        window.gsRTC.on(eventType,handlerFun);
-        window.gsRTC.handlerFuns[eventType] = handlerFun;
-    }else {
-        log.error("ERR_NOT_INITIALIZED: Engine not initialized yet. Please create gsRTC first");
     }
 }
 

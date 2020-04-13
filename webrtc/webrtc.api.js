@@ -157,13 +157,22 @@ function stopScreen(callback){
     gsRTC.RTCSession.processRemoveStream(stream, pc, 'slides')
     gsRTC.RTCSession.closeStream(stream);
 
-    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
-    gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
-    if(callback){
-        callback({codeType: 200})
+    if(gsRTC.serverAction){
+        let errorInfo = {
+            errorId: 200,
+            message: 'Request success!'
+        }
+        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+        gsRTC.serverAction = null
     }else {
-        gsRTC.action = 'switchScreenSource'
-        gsRTC.trigger(gsRTC.action, {codeType: 200});
+        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
+        gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
+        if(callback){
+            callback({codeType: 200})
+        }else {
+            gsRTC.action = 'switchScreenSource'
+            gsRTC.trigger(gsRTC.action, {codeType: 200});
+        }
     }
 }
 
