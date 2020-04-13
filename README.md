@@ -106,13 +106,13 @@ a=group:BUNDLE 2
 
 
 - Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
-Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.
+Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.[done]
 
 处理：收到sdp后，设置时，要修改mid为原来的值
 
 
 - Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
-Failed to set remote offer sdp: The order of m-lines in subsequent offer doesn't match order from previous offer/answer.
+Failed to set remote offer sdp: The order of m-lines in subsequent offer doesn't match order from previous offer/answer.[done]
 
 
 
