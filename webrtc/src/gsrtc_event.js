@@ -49,8 +49,10 @@ GsRTC.prototype.serverPresentRequest = function (data) {
                 stopScreen()
             }else {
                 let rspInfo = {
-                    rspCode: 700,
-                    rspMsg: 'Present turn Off request denied'
+                    // rspCode: 700,
+                    // rspMsg: 'Present turn Off request denied',
+                    errorId: 700,
+                    message: 'Present turn Off request denied'
                 }
                 This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
                 This.serverAction = null
@@ -61,8 +63,10 @@ GsRTC.prototype.serverPresentRequest = function (data) {
                 beginScreen()
             }else {
                 let rspInfo = {
-                    rspCode: 701,
-                    rspMsg: 'Present turn On Request denied'
+                    // rspCode: 701,
+                    // rspMsg: 'Present turn On Request denied',
+                    errorId: 701,
+                    message: 'Present turn On Request denied'
                 }
                 This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
                 This.serverAction = null

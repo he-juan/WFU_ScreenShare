@@ -77,8 +77,11 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
     let action = Object.keys(messageObj)[0]
     log.info('handleIncomingMessage of: ' + action)
     let data = messageObj[action]
-    if(data.rspInfo){
-        code = data.rspInfo.rspCode;
+    // if(data.rspInfo){
+    //     code = data.rspInfo.rspCode;
+    // }
+    if(data.errorInfo) {
+        code = data.errorInfo.errorId;
     }
     log.info('get code: ' + code)
 
@@ -90,7 +93,8 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 let sdp = data.sdp.data
                 gsRTC.RTCSession.handleRemoteSDP(sdp)
             }else if(gsRTC.isNxx(4, code)){
-                log.error(code + ', ' + data.rspInfo.rspMsg)
+                log.error(code + ', ' + data.errorInfo.message)
+                // log.error(code + ', ' + data.rspInfo.rspMsg)
             }
             break;
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT.name:
@@ -108,7 +112,8 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 log.info('present on request success')
             }else if(gsRTC.isNxx(4, code)){
                 log.warn('present on request error')
-                log.error('present on request error: ' + data.rspInfo.rspMsg)
+                log.error(code + ', ' + data.errorInfo.message)
+                // log.error('present on request error: ' + data.rspInfo.rspMsg)
             }
             break
         case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE.name:
@@ -145,8 +150,10 @@ WebSocketInstance.prototype.handleSharingSignal = function(){
     if(gsRTC.isNonInviteSignalNeed){
         if(This.serverAction){
             let rspInfo = {
-                rspCode: 200,
-                rspMsg: 'Request success!'
+                errorId: 200,
+                message: 'Request success!',
+                // rspCode: 200,
+                // rspMsg: 'Request success!'
             }
             This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
             This.serverAction = null
@@ -210,7 +217,8 @@ WebSocketInstance.prototype.sendMessage = function (data) {
     // 回复消息
     if(data.presentRet){
         // gs_phone请求开启或关闭演示的回复信息
-        info.rspInfo = data.rspInfo
+        // info.rspInfo = data.rspInfo
+        info.errorInfo = data.errorInfo
     }
 
     log.warn("ws send message ");
