@@ -158,11 +158,11 @@ function stopScreen(callback){
     gsRTC.RTCSession.closeStream(stream);
 
     if(gsRTC.serverAction){
-        let errorInfo = {
-            errorId: 200,
-            message: 'Request success!'
+        let rspInfo = {
+            rspCode: 200,
+            rspMsg: 'Request success!'
         }
-        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
         gsRTC.serverAction = null
     }else {
         gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})

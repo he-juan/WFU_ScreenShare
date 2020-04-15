@@ -77,8 +77,8 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
     let action = Object.keys(messageObj)[0]
     log.info('handleIncomingMessage of: ' + action)
     let data = messageObj[action]
-    if(data.errorInfo){
-        code = data.errorInfo.errorId;
+    if(data.rspInfo){
+        code = data.rspInfo.rspCode;
     }
     log.info('get code: ' + code)
 
@@ -90,7 +90,7 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 let sdp = data.sdp.data
                 gsRTC.RTCSession.handleRemoteSDP(sdp)
             }else if(gsRTC.isNxx(4, code)){
-                log.error(code + ', ' + data.errorInfo.message)
+                log.error(code + ', ' + data.rspInfo.rspMsg)
             }
             break;
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT.name:
@@ -108,7 +108,7 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 log.info('present on request success')
             }else if(gsRTC.isNxx(4, code)){
                 log.warn('present on request error')
-                log.error('present on request error: ' + data.errorInfo.message)
+                log.error('present on request error: ' + data.rspInfo.rspMsg)
             }
             break
         case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE.name:
@@ -124,6 +124,7 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
         case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET.name:
             break
         case gsRTC.SIGNAL_EVENT_TYPE.BYE.name:
+                // TODO: 提示页面挂断请求，获取授权
             break
         case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET.name:
             break
@@ -143,11 +144,11 @@ WebSocketInstance.prototype.handleSharingSignal = function(){
     log.info('handle signal')
     if(gsRTC.isNonInviteSignalNeed){
         if(This.serverAction){
-            let errorInfo = {
-                errorId: 200,
-                message: 'Request success!'
+            let rspInfo = {
+                rspCode: 200,
+                rspMsg: 'Request success!'
             }
-            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, errorInfo})
+            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
             This.serverAction = null
         }else {
             let permission = {
@@ -209,7 +210,7 @@ WebSocketInstance.prototype.sendMessage = function (data) {
     // 回复消息
     if(data.presentRet){
         // gs_phone请求开启或关闭演示的回复信息
-        info.errorInfo = data.errorInfo
+        info.rspInfo = data.rspInfo
     }
 
     log.warn("ws send message ");
