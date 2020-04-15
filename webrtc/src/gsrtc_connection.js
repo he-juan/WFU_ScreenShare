@@ -22,18 +22,19 @@ PeerConnection.prototype.decorateLocalSDP = function () {
  * @param sdp
  */
 PeerConnection.prototype.handleRemoteSDP  = function(sdp){
+    log.info('handle remote sdp')
     let This = this
     if(!sdp){
         log.error("commonDecorateRo: Invalid Argument");
         return;
     }
     // TODO: gs_phone 不支持x-googel私有字段，web 端添加
-    sdp = gsRTC.setXgoogleBitrate(sdp, 4096)
+    sdp = This.gsRTC.setXgoogleBitrate(sdp, 4096)
     log.info('commonDecorateRo:\n'  + sdp)
 
     sdp = This.modifiedMidBeforeSetRemoteSDP(sdp)
     This.setRemote(sdp)
-    gsRTC.isSendReInvite = true
+    This.gsRTC.isSendReInvite = true
 }
 
 /**
@@ -60,6 +61,48 @@ PeerConnection.prototype.modifiedMidBeforeSetRemoteSDP = function (sdp) {
         for(let j in mLineOrder){
             if(type === mLineOrder[j]){
                 mediaArray[j] = parseSDP.media[i]
+            }
+        }
+
+        if(type=== 'slides' && !This.gsRTC.initialResolution){
+            This.gsRTC.initialResolution = {}
+            if(parseSDP.media[i].framerate){
+                This.gsRTC.initialResolution.framerate = parseSDP.media[i].framerate
+            }
+            for(let fmtpItem of parseSDP.media[i].fmtp){
+                if(fmtpItem.config.indexOf('profile-level-id') >= 0){
+                    let levelIdc = fmtpItem.config.substr(21, 2)
+                    let resolution = {}
+                    switch (levelIdc) {
+                        case '15':
+                            resolution = {width: 480, height: 272}
+                            break;
+                        case '16':
+                            resolution = {width: 640, height: 360}
+                            break;
+                        case '1e':
+                            resolution = {width: 848, height: 480}
+                            break;
+                        case '1f':
+                            resolution = {width: 1280, height: 720}
+                            break;
+                        case '28':
+                            resolution = {width: 1920, height: 1080}
+                            break;
+                        case '33':
+                            resolution = {width: 3840, height: 2160}
+                            break
+                        default:
+                            resolution = {width: 640, height: 360}
+                            log.info('return default value 640 * 360')
+                            log.info("getH264ResolutionBySdp: The value is out of the range, " + levelIdc);
+                            break;
+                    }
+
+                    This.gsRTC.initialResolution.width = resolution.width
+                    This.gsRTC.initialResolution.height = resolution.height
+                    break
+                }
             }
         }
     }

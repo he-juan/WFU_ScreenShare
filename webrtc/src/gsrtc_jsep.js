@@ -193,7 +193,7 @@ PeerConnection.prototype.doOffer = async function (pc) {
 
     // Added checks to ensure that state is "stable" if setting local "offer"
     if (pc.signalingState !== 'stable') {
-        log.info("Dropping of creating of offer as signalingState is not " + pc.signalingState);
+        log.warn("Dropping of creating of offer as signalingState is not " + pc.signalingState);
         return;
     }
     log.info('Creating offer');
@@ -318,10 +318,19 @@ PeerConnection.prototype.setRemote = async function (sdp) {
  * set remote desc success
  * @param pc
  */
-PeerConnection.prototype.setRemoteDescriptionSuccess = function (pc) {
+PeerConnection.prototype.setRemoteDescriptionSuccess = function () {
     let This = this
-    log.info('setRemoteDescription success ( ' + pc.type + ')')
-    This.gsRTC.sokect.handleSharingSignal()
+    log.info('setRemoteDescription success ')
+
+    if(This.gsRTC.sendCtrlPresentation){
+        if(gsRTC.sharingPermission > 3){
+            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: gsRTC.CODE_TYPE.SUCCESS })
+        }else {
+            This.gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: gsRTC.sharingPermission }})
+        }
+    }else {
+        This.gsRTC.trigger(This.gsRTC.action, This.gsRTC.CODE_TYPE.SUCCESS);
+    }
 }
 
 /**

@@ -34,22 +34,21 @@ GsRTC.prototype.VIDEO_RESOLUTION = {
 }
 
 GsRTC.prototype.MID_OBJ = {
-    AUDIO_MID: {
-        ORIGINAL_MID: null,
-        MODIFIED_MID: null
-    },
-    MAIN_MID: {
-        ORIGINAL_MID: null,
-        MODIFIED_MID: null
-    },
-    SLIDES_MID: {
-        ORIGINAL_MID: null,
-        MODIFIED_MID: null
-    },
-    GUI_MID: {
-        ORIGINAL_MID: null,
-        MODIFIED_MID: null
-    }
+    AUDIO_MID: { ORIGINAL_MID: null, MODIFIED_MID: null },
+    MAIN_MID: { ORIGINAL_MID: null, MODIFIED_MID: null },
+    SLIDES_MID: { ORIGINAL_MID: null, MODIFIED_MID: null},
+    GUI_MID: { ORIGINAL_MID: null, MODIFIED_MID: null}
+}
+
+GsRTC.prototype.CODE_TYPE = {
+    SUCCESS: {codeType: 200, message: 'operate success'},
+    VIDEO_ON_FAILED: { codeType: 10001, message: 'failed to video on' },
+    AUDIO_REFRESH_FAILED: { codeType: 1002, message: 'failed to refresh audio' },
+    PRESENT_ON_FAILED: { codeType: 10003, message: 'failed to present on' },
+    INVALID_WEBSOCKET_ADDRESS: { codeType: 1000, message: 'webSocket address is not a valid address' },
+
+    SHARE_SCREEN_REQUEST_REFUSE: { codeType: 20001, message: 'Present turn On Request denied'  },
+    STOP_SHARE_SCREEN_REQUEST_REFUSE: { codeType: 20002, message: 'Present turn Off Request denied'  },
 }
 
 GsRTC.prototype.SIGNAL_EVENT_TYPE = {
@@ -75,3 +74,4 @@ GsRTC.prototype.SIGNAL_EVENT_TYPE = {
     BYE: { id: 0x01 << 15, name: 'destoryMediaSession' },                         // 结束会话
     BYE_RET: { id: 0x01 << 16, name: 'destoryMediaSessionRet' },                  // 结束会话的回复
 }
+

@@ -112,7 +112,7 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
 
     let pc = gsRTC.RTCSession.peerConnection
     if(pc.isLocalSdpPending === true){
-        log.info('MyOnIceGatheringCompleted not ready( ' + pc.type + " )")
+        log.info('MyOnIceGatheringCompleted not ready ')
         return false;
     }
     log.warn("__MyOnIceGatheringCompleted be ready to send INVITE or 200OK");
@@ -122,7 +122,7 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
     This.gsRTC.saveSDPSessionVersion(sdp)
     let data = {
         type: gsRTC.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
-        sdp: sdp
+        mediaSession: sdp
     }
     This.gsRTC.sokect.sendMessage(data)
 }

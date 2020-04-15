@@ -72,6 +72,7 @@ WebSocketInstance.prototype.createWebSocket = function(url, protocols){
  * @param message
  */
 WebSocketInstance.prototype.handleIncomingMessage = function(message){
+    let This = this
     let code = null
     let messageObj = JSON.parse(message)
     let action = Object.keys(messageObj)[0]
@@ -88,85 +89,40 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
     switch (action) {
         case gsRTC.SIGNAL_EVENT_TYPE.INVITE_RET.name:
         case gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE_RET.name:
-            // gs_phone的主动呼叫和主动更新会话信息，目前没有实现，但是需要考虑
             if(gsRTC.isNxx(2, code)){
                 let sdp = data.sdp.data
+                log.info(gsRTC.action + ' success')
                 gsRTC.RTCSession.handleRemoteSDP(sdp)
             }else if(gsRTC.isNxx(4, code)){
                 log.error(code + ', ' + data.errorInfo.message)
                 // log.error(code + ', ' + data.rspInfo.rspMsg)
+                gsRTC.trigger(gsRTC.action, {
+                    codeType: code,
+                    message: data.errorInfo.message
+                });
             }
             break;
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT.name:
             // gs_phone请求开演示
             if(data.sendPermission === 2){
                 log.warn('receive request to turn off desktop sharing')
-                gsRTC.serverAction = 'presentTurnOffRequest'
+                gsRTC.serverAction = 'shareScreenRequest'
+                gsRTC.trigger('shareScreenRequest', gsRTC.serverPresentRequest)
             }else if(data.sendPermission === 3){
                 log.warn('receive request to turn on desktop sharing')
-                gsRTC.serverAction = 'presentTurnOnRequest'
+                gsRTC.serverAction = 'stopShareScreenRequest'
+                gsRTC.trigger('stopShareScreenRequest', gsRTC.serverPresentRequest)
             }
             break
         case gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET.name:
-            if(gsRTC.isNxx(2, code)){
-                log.info('present on request success')
-            }else if(gsRTC.isNxx(4, code)){
-                log.warn('present on request error')
-                log.error(code + ', ' + data.errorInfo.message)
-                // log.error('present on request error: ' + data.rspInfo.rspMsg)
-            }
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.MESSAGE_RET.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_USER_INFO_RET.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.UPDATE_CANDIDATE_INFO_RET.name:
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.BYE.name:
-                // TODO: 提示页面挂断请求，获取授权
-            break
-        case gsRTC.SIGNAL_EVENT_TYPE.BYE_RET.name:
+            log.info('present on request ' + code)
+            gsRTC.trigger(gsRTC.action, {
+                codeType: code,
+                message: data.errorInfo.message
+            });
             break
         default:
             break
-    }
-
-    gsRTC.trigger(gsRTC.action, {codeType: code});
-    gsRTC.action = null
-}
-
-/**
- * 处理共享信令：摄像头或桌面共享
- */
-WebSocketInstance.prototype.handleSharingSignal = function(){
-    let This = this
-    log.info('handle signal')
-    if(gsRTC.isNonInviteSignalNeed){
-        if(This.serverAction){
-            let rspInfo = {
-                errorId: 200,
-                message: 'Request success!',
-                // rspCode: 200,
-                // rspMsg: 'Request success!'
-            }
-            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
-            This.serverAction = null
-        }else {
-            let permission = {
-                value: gsRTC.sharingPermission
-            }
-            log.info('prepare send control signal: ' + permission.value)
-            This.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission})
-
-            gsRTC.isNonInviteSignalNeed = false
-            gsRTC.sharingPermission = gsRTC.sharingPermission ? 0 : 1
-        }
     }
 }
 
@@ -175,7 +131,8 @@ WebSocketInstance.prototype.handleSharingSignal = function(){
  * @param data
  */
 WebSocketInstance.prototype.sendMessage = function (data) {
-    if(!this.ws){
+    let This = this
+    if(!This.ws){
         log.warn('websocket has not been created yet to send message')
         return
     }
@@ -185,46 +142,24 @@ WebSocketInstance.prototype.sendMessage = function (data) {
         userName: gsRTC.conf.userName,
         reqId: reqId,
     }
+    let signalType = data.type.name
+    let message = {}
+    message[signalType] = info
 
-    // 发送
-    if(data.sdp){
-        // invite 或 re-invite
+    if(data.mediaSession){
         info.sdp = {
-            length: data.sdp.length,
-            data: data.sdp,
+            length: data.mediaSession.length,
+            data: data.mediaSession,
         }
         log.info('Establish or update a session')
-    }else if(data.permission){
-        // 开演示或关演示
-        info.sendPermission = data.permission.value
+    }else if(data.ctrlPresentation){
+        info.sendPermission = data.ctrlPresentation.value
         log.info('send present control message: \n' + JSON.stringify(info))
-    }else if(data.message){
-        // 发送message消息
-        Object.keys(data.message).forEach(function(index) {
-            info[index] = data.message[index]
-        });
-        log.info('send message')
-    }else if(data.userInfo){
-        // 更新用户信息
-        info.userInfo = data.userInfo
-        log.info('client update user info')
-    }else if(data.candidates){
-        // trickle-ice时，发送收集的candidate
-        info.mid = data.mid
-        info.candidates = data.candidates
-        log.info('trickle-ice, send candidates')
-    }
-    // 回复消息
-    if(data.presentRet){
-        // gs_phone请求开启或关闭演示的回复信息
-        // info.rspInfo = data.rspInfo
+    }else if(data.ctrlPresentationRet){
         info.errorInfo = data.errorInfo
     }
 
     log.warn("ws send message ");
-    let type = data.type.name
-    let message = {}
-    message[type] = info
-    this.ws.send(JSON.stringify(message))
+    This.ws.send(JSON.stringify(message))
 }
 

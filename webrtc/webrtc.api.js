@@ -6,6 +6,19 @@ log.warn = window.debug("WEBRTC_API:WARN");
 log.error = window.debug("WEBRTC_API:ERROR");
 /*Log Debug End*/
 
+/**
+ * Open to upper-level event registration interface
+ * eventType：Event type
+ * handerFun：User-defined processing functions
+ */
+function addEventHandler(eventType,handlerFun){
+    if (window.gsRTC){
+        window.gsRTC.on(eventType,handlerFun);
+        window.gsRTC.handlerFuns[eventType] = handlerFun;
+    }else {
+        log.error("ERR_NOT_INITIALIZED: Engine not initialized yet. Please create gsRTC first");
+    }
+}
 
 /**
  * 呼叫
@@ -15,7 +28,8 @@ log.error = window.debug("WEBRTC_API:ERROR");
 function call(wsAddr, callback) {
     let protocols = 'gs-webrtc-json';
     if(!wsAddr){
-        alert('INVALID WEBSOCKET ADDRESS：' + wsAddr)
+        log.error('INVALID WEBSOCKET ADDRESS：' + wsAddr)
+        callback(gsRTC.CODE_TYPE.INVALID_WEBSOCKET_ADDRESS)
         return
     }
 
@@ -24,7 +38,74 @@ function call(wsAddr, callback) {
         websocketUrl: wsAddr,
     }
     gsRTC.sokect = new WebSocketInstance(sipRegisterInfo.websocketUrl, sipRegisterInfo.protocol)
-    gsRTC.inviteCall(callback);
+    gsRTC.inviteCall({callback: callback});
+}
+
+/**
+ * 开启屏幕共享
+ * @param callback
+ */
+function beginScreen(callback){
+    log.info('start present!!')
+    if (!gsRTC) {
+        log.warn('gsRTC is not initialized')
+        return
+    }
+    if (!gsRTC.RTCSession) {
+        log.warn("please call first")
+        return
+    }
+
+    let data = {
+        type: 'slides',
+        callback: callback
+    }
+
+    gsRTC.sharingPermission = 1
+    gsRTC.shareScreen(data)
+}
+
+/**
+ * 暂停屏幕共享
+ * @param isMute：true 暂停，false 取消暂停
+ * @param callback
+ */
+function pausePresent(isMute, callback){
+    if (!gsRTC) {
+        log.warn('gsRTC is not initialized')
+        return
+    }
+    if (!gsRTC.RTCSession) {
+        log.warn("please call first")
+        return
+    }
+
+    let type = 'slides'
+    let stream = gsRTC.RTCSession.getStream(type, true)
+    log.info('pause present stream')
+    gsRTC.RTCSession.streamMuteSwitch({type: type, stream: stream, mute: isMute})
+    if(callback){
+        callback(gsRTC.CODE_TYPE.SUCCESS)
+    }
+}
+
+/**
+ * 停止桌面共享
+ * @param callback
+ */
+function stopScreen(callback){
+    log.info('stop present!!')
+    if (!gsRTC) {
+        log.warn('gsRTC is not initialized')
+        return
+    }
+    if (!gsRTC.RTCSession) {
+        log.warn("please call first")
+        return
+    }
+
+    gsRTC.sharingPermission = 0
+    gsRTC.stopShareScreen({callback: callback})
 }
 
 /**
@@ -57,131 +138,13 @@ function stopVideo(callback){
         return
     }
 
-    let stream = gsRTC.RTCSession.getStream("main", true)
-    let pc = gsRTC.RTCSession.peerConnection
-    gsRTC.RTCSession.processRemoveStream(stream, pc, 'main')
-    gsRTC.RTCSession.closeStream(stream);
-    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
-    gsRTC.RTCSession.setMediaElementStream(null, 'main', 'true')
-
-    if(callback){
-        callback({codeType: 200})
-    }else {
-        gsRTC.action = 'stopShareScreen'
-        gsRTC.trigger(gsRTC.action, {codeType: 200});
-    }
-}
-
-/**
- * 开启屏幕共享
- * @param callback
- */
-function beginScreen(callback){
-    log.info('start present!!')
-    if (!gsRTC) {
-        log.warn('gsRTC is not initialized')
-        return
-    }
-    if (!gsRTC.RTCSession) {
-        log.warn("please call first")
-        return
-    }
-
-    gsRTC.isNonInviteSignalNeed = true
-    gsRTC.sharingPermission = 1
-    let constraints = {
-        audio: false,
-        video: {
-            width: {ideal: 1920,},
-            height: {ideal: 1080,},
-            frameRate: {ideal: 15,}
-        }
-    };
-
-    let data = {
-        type: 'slides',
-        constraints: constraints,
-        callback: callback
-    }
-
-    gsRTC.shareScreen(data)
-}
-
-/**
- * 暂停屏幕共享
- * @param isMute：true 暂停，false 取消暂停
- * @param callback
- */
-function pausePresent(isMute, callback){
-    if (!gsRTC) {
-        log.warn('gsRTC is not initialized')
-        return
-    }
-    if (!gsRTC.RTCSession) {
-        log.warn("please call first")
-        return
-    }
-
-
-    let type = 'slides'
-    let stream = gsRTC.RTCSession.getStream(type, true)
-    log.info('pause present stream')
-    gsRTC.RTCSession.streamMuteSwitch({type: type, stream: stream, mute: isMute})
-
-    if(callback){
-        callback({codeType: 200})
-    }else {
-        gsRTC.action = 'switchScreenSource'
-        gsRTC.trigger(gsRTC.action, {codeType: 200});
-    }
-}
-
-/**
- * 停止桌面共享
- * @param callback
- */
-function stopScreen(callback){
-    log.info('stop present!!')
-    if (!gsRTC) {
-        log.warn('gsRTC is not initialized')
-        return
-    }
-    if (!gsRTC.RTCSession) {
-        log.warn("please call first")
-        return
-    }
-
-
-    let stream = gsRTC.RTCSession.getStream("slides", true)
-    let pc = gsRTC.RTCSession.peerConnection
-    gsRTC.RTCSession.processRemoveStream(stream, pc, 'slides')
-    gsRTC.RTCSession.closeStream(stream);
-
-    if(gsRTC.serverAction){
-        let rspInfo = {
-            // rspCode: 200,
-            // rspMsg: 'Request success!',
-            errorId: 200,
-            message: 'Request success!'
-        }
-        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
-        gsRTC.serverAction = null
-    }else {
-        gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, permission: {value: 0}})
-        gsRTC.RTCSession.setMediaElementStream(null, 'slides', 'true')
-        if(callback){
-            callback({codeType: 200})
-        }else {
-            gsRTC.action = 'switchScreenSource'
-            gsRTC.trigger(gsRTC.action, {codeType: 200});
-        }
-    }
+    gsRTC.stopShareVideo({callback: callback})
 }
 
 /**
  * 挂断
  */
-function hangup() {
+function hangup(callback) {
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -196,9 +159,7 @@ function hangup() {
         return
     }
 
-    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.BYE})
-    gsRTC.closePeerConn()
-    gsRTC.sokect.ws.close()
+    gsRTC.endCall({callback: callback})
 }
 
 /**

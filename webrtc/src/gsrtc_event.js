@@ -7,74 +7,41 @@ log.error = window.debug("GSRTC_EVENT:ERROR");
 /*Log Debug End*/
 
 /**
- * Open to upper-level event registration interface
- * eventType：Event type
- * handerFun：User-defined processing functions
- */
-GsRTC.prototype.addSipEventHandler = function(eventType,handlerFun){
-    this.preInit();
-    if (window.gsRTC){
-        window.gsRTC.on(eventType,handlerFun);
-        window.gsRTC.handlerFuns[eventType] = handlerFun;
-    }else {
-        log.error("ERR_NOT_INITIALIZED: Engine not initialized yet. Please create gsRTC first");
-    }
-}
-
-/**
  * Event registration
  */
 GsRTC.prototype.eventBindings = function(){
     log.info('event binding.')
     let This = this
-    this.on('onEventStack', This.eventStack)
-    this.on('serverPresentRequest', This.serverPresentRequest)
 }
 
 /**
- * event stack 所有回调调用触发的地方
- * @param event
+ * 获得授权后处理
+ * @param confirm: true 表示同意， false表示拒绝
  */
-GsRTC.prototype.eventStack = function(event){
-
-}
-
-
-GsRTC.prototype.serverPresentRequest = function (data) {
+GsRTC.prototype.serverPresentRequest = function (confirm) {
     let This = this
-    log.warn('data: ', data)
+    log.warn('confirm: ', confirm)
     switch (This.serverAction) {
-        case 'presentTurnOffRequest':
-            if(data.permission){
-                stopScreen()
+        case 'shareScreenRequest':
+            if(confirm){
+                This.sharingPermission = 3
+                This.shareScreen()
             }else {
-                let rspInfo = {
-                    // rspCode: 700,
-                    // rspMsg: 'Present turn Off request denied',
-                    errorId: 700,
-                    message: 'Present turn Off request denied'
-                }
-                This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
-                This.serverAction = null
-            }
-            break;
-        case 'presentTurnOnRequest':
-            if(data.permission){
-                beginScreen()
-            }else {
-                let rspInfo = {
-                    // rspCode: 701,
-                    // rspMsg: 'Present turn On Request denied',
-                    errorId: 701,
-                    message: 'Present turn On Request denied'
-                }
-                This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, rspInfo})
-                This.serverAction = null
+                This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: This.CODE_TYPE.SHARE_SCREEN_REQUEST_REFUSE})
             }
             break
+        case 'stopShareScreenRequest':
+            if(confirm){
+                This.sharingPermission = 4
+                This.stopShareScreen()
+            }else {
+                This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: This.CODE_TYPE.STOP_SHARE_SCREEN_REQUEST_REFUSE})
+            }
+            break;
         default:
             break
     }
+    This.serverAction = null
 }
 
 

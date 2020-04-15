@@ -12,13 +12,7 @@
 > 2、针对不支持getDisplayMedia的浏览器，WFU不做支持
 > 3、使用该时必须使用HTTPS，因为webRTC的接口在非https下，无法访问。
 
-
-### webRTC 分辨率控制
-
-- gs_phone为对称协商，携带的分辨率根据webRTC 能力决定
-
-- 对于webRTC没有携带的字段，gs_phone认为是不支持的
-
+----
 
 ### webRTC 码率控制
 
@@ -29,26 +23,10 @@
 - google私有字段：x-google-min-bitrate、x-google-start-bitrate、x-google-max-bitrate等
 
 > webRTC 发送的码率由gs_phone能力决定。如果gs_phone没有携带控制带宽的参数，webRTC会发送比较低的码率。
-> gs_phone 根据web端携带情况添加b行，web端需携带b行参数，web且为了兼容不同浏览器，需同时携带b=AS、b=TIAS
-> gs_phone 不支持x-google字段，需web端添加
+> ~~gs_phone 根据web端携带情况添加b行，web端需携带b行参数，web且为了兼容不同浏览器，需同时携带b=AS、b=TIAS~~
+> gs_phone 不支持x-google字段，webRTC收到sdp添加x-google等字段控制码率
 
-
-### 逻辑说明
-
-- 建立通话：
-    + 通过 createMediaSession 交换sdp（类似INVITE），建立点对点连接
-- 开演示：
-    + 通过 updateMediaSession 交换sdp（类似RE-INVITE）
-    + sdp处理完成后，再发送 ctrlPresentation 信令，告知gs_phone开启发送演示流
-- 暂停演示：
-   + 通过操作track enabled 属性实现静音和非静音切换，信令上不做任何操作
-- 关演示：
-    + 发送 ctrlPresentation 信令告知 gs_phone关闭演示
-    + webRTC端不重新协商sdp。关闭演示后删除PC中的演示流
-- 结束通话：
-    + 通过 destoryMediaSession 结束通话
-    + 关闭peerConnection，关闭webSocket连接
-
+-----
 
 ### mid 和content 说明
 
@@ -67,62 +45,124 @@
 
 > 通过mid标识媒体行，content区分主流、演示流、gui视频流
 
-### FAQ
+----
 
-1、开演示发送 updateMediaSession 和 ctrlPresentation，并处理成功后，遇到ice failed，再次重新updateMediaSession，没有发送ctrlPresentation，此时gs_phone不显示演示流
-
-2、使用captureStream创建三个m行时，audio会在最后面，sdp处理就会出现错误
-
-- 修改 BUNDLE 信息：[done]
-
-```
-a=group:BUNDLE 0 1 2
-a=msid-semantic: WMS c18e53b4-248f-4502-9ad2-1b147e638883
-
-// 替换为：每路流单独发送
-a=msid-semantic: WMS
-a=msid-semantic: WMS
-a=msid-semantic: WMS
-a=group:BUNDLE 0
-a=group:BUNDLE 1
-a=group:BUNDLE 2
-```
-
-- 如果没有流，则删除sdp中的ssrc等相应字段 [done]
-
-- 合并sdp [done]
-
-- 修改mid [done]
-
-- 根据编解码名称去除对应编解码[done]
-
-- gs_phone请求关闭演示时，webRTC需要发送ctrlPresentationRet命令，告诉gs_phone请求是否成功 [待办]
-    + 关闭时需要通知页面端，得到页面端回复后，才能发送回复信令给gs_phone
-    + 超时未回复，默认为拒绝 ？？？
-
-- 回复信令的状态码如何定义？？[待办]
-
-### mid 说明
+#### mid 注意事项
 
 - offer answer中每个m行的mid需对应，例如：offer audio mid=0，answer audio mid=0
+
 - offer answer中每个m行顺序需要一致，如offer audio为第一个m行，answer中的audio也需要在第一个m行
+
 - 需要保存一开始offer中。各个m行的顺序
 
-
-- Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
-Failed to set remote answer sdp: The order of m-lines in answer doesn't match order in offer. Rejecting answer.[done]
-
-处理：收到sdp后，设置时，要修改mid为原来的值
+> 发送invite之前，修改自己的sdp，调整m位置，保持audio在第一个m行。收到对端的sdp后，setRemoteDescription之前，需要修改mid，与offer端创建出来的mid保持一致。
 
 
-- Failed to set remote description: InvalidAccessError: Failed to execute 'setRemoteDescription' on 'RTCPeerConnection': 
-Failed to set remote offer sdp: The order of m-lines in subsequent offer doesn't match order from previous offer/answer.[done]
+### 功能描述
+   
+#### web 端
+1、建立通话：
+    - 通过 createMediaSession 交换sdp（类似INVITE），建立点对点连接
+       +  Web->GsPhone ：createMediaSession
+       +  GsPhone->Web：createMediaSessionRet
+    
+    
+2、开演示：
+    - 通过 updateMediaSession 交换sdp（类似RE-INVITE）,sdp处理完成后，再发送 ctrlPresentation 信令，告知gs_phone开启发送演示流
+         +  Web->GsPhone ：updateMediaSession
+         +  GsPhone->Web：updateMediaSessionRet 
+         +  Web->GsPhone ：ctrlPresentation
+         +  GsPhone->Web：ctrlPresentationRet 
+        
+    
+3、暂停演示：
+   - 通过操作track enabled 属性实现静音和非静音切换，信令上不做任何操作
+
+
+4、关演示：
+    - 发送 ctrlPresentation 信令告知 gs_phone关闭演示，webRTC端不重新协商sdp。关闭演示后删除PC中的演示流
+        +  Web->GsPhone ：ctrlPresentation
+        +  GsPhone->Web：ctrlPresentationRet 
+
+
+5、结束通话：
+    - 通过 destoryMediaSession 结束通话，关闭peerConnection，关闭webSocket连接
+        + Web->GsPhone: destoryMediaSession
+    
+----
+
+#### gs_phone
+
+1、请求开启演示
+    - 通过 ctrlPresentation 请求开启演示
+         +  GsPhone->Web：ctrlPresentation 
+    - 允许开启：
+         +  Web->GsPhone ：updateMediaSession
+         +  GsPhone->Web：updateMediaSessionRet 
+         +  Web->GsPhone ：ctrlPresentationRet
+    - 拒绝开启：
+         + Web->GsPhone ：ctrlPresentationRet
+
+2、请求关闭演示：
+    - 通过 ctrlPresentation 请求关闭演示
+         +  GsPhone->Web：ctrlPresentation 
+    - 允许关闭：
+        + 还需要再发送一次 ctrlPresentation 来关闭吗？[思考]
+        + Web->GsPhone ：ctrlPresentationRet
+    - 拒绝关闭：
+        + Web->GsPhone ：ctrlPresentationRet
+
+----
+  
+#### 逻辑说明
+
+- invite 或 re-invite
+    + 收到4xx时直接调用回调
+    + 收到2xx时，setRemoteDescriptionSuccess后判断是否需要发送 ctrlPresentation：
+        - 需要：发送ctrlPresentation，收到ctrlPresentationRet调用回调
+        - 不需要：直接调用回调
 
 
 
+-----
+
+### 页面端注册事件说明
+
+- gsRTC.on 修改为 addEventHandler
+
+- web开演示的回调：addEventHandler('shareScreen', shareScreenHandler)
+
+- web暂停演示：addEventHandler('pauseShareScreen', pauseShareScreenHandler)
+
+- web关闭演示的回调：addEventHandler('stopShareScreen', stopShareScreenHandler)
+
+- web结束通话: addEventHandler('hangup', hangupHandler)
+
+- gs_phone请求开启演示: addEventHandler('shareScreenRequest', shareScreenRequestHandler)
+
+- gs_phone请求关闭演示: addEventHandler('stopShareScreenRequest', stopShareScreenRequestHandler)
+
+- gs_phone请求结束通话: addEventHandler('hangupRequest', hangupRequestHandler)
+
+----
+
+### 待处理
+
+- 要通过初始invite获取演示的分辨率和帧率
 
 
+----
+
+### 注意事项
+
+- ~~gs_phone为对称协商，携带的分辨率根据webRTC 能力决定，对于webRTC没有携带的字段，gs_phone认为是不支持的~~   已修改为非对称协商，因为浏览器只支持非对称
 
 
+----
+### FAQ
+
+- 开演示发送 updateMediaSession 和 ctrlPresentation，并处理成功后，遇到ice failed，再次重新updateMediaSession，没有发送ctrlPresentation，此时gs_phone不显示演示流 [待处理]
+
+- 信令交互设计里面，没有带action标识本次请求做的事情[应该优化]
 
 

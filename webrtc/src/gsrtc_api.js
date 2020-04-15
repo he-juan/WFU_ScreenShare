@@ -21,10 +21,11 @@ let GsRTC = function (options) {
     this.sessionVersion = 0
     this.action = null
     this.isSendReInvite = false            // 判断是否为re-invite
-    this.isNonInviteSignalNeed = false     // 标记是否发送非invite信令，如ctrlPresentation
+    this.sendCtrlPresentation = false      // 判断是否需要发送ctrlPresentation控制信令
     this.sharingPermission = 0             // 标记共享命令：1开启 0关闭
     this.mLineOrder = []                   // 记录m行的顺序
     this.serverAction = null
+    this.initialResolution = null
 
     this.device = new MediaDevice()
     this.eventBindings()
@@ -79,48 +80,19 @@ GsRTC.prototype.setHtmlMediaElement = function(args){
 
 /**
  * call and send invite
- * @param callback
+ * @param data
  */
-GsRTC.prototype.inviteCall = function (callback) {
+GsRTC.prototype.inviteCall = function (data) {
     let This = this
     This.conf = {
         userName: 'webRTC_Client',
-        initialResolution : This.getScreenResolution()
+        // initialResolution : This.getScreenResolution()
     }
-    This.action = 'onCall'
-    This.on('onCall', callback)
+    This.action = 'call'
+    This.on(This.action, data.callback)
+
     This.RTCSession = new PeerConnection(This)
     This.RTCSession.createMultiStreamRTCSession(This.conf)
-}
-
-
-/**
- * Leave the meeting
- */
-GsRTC.prototype.closePeerConn = function () {
-    let This = this
-    if(!This.RTCSession){
-        log.error("RTCSession is not initialized")
-        return
-    }
-    try {
-        // close stream
-        for (let key in This.MEDIA_STREAMS) {
-            let stream = This.MEDIA_STREAMS[key];
-            this.RTCSession.closeStream(stream)
-        }
-
-        let pc = This.RTCSession.peerConnection
-        // close peerConnection
-        pc.getSenders().forEach(sender => {
-            delete sender.track
-            sender.replaceTrack(null)
-        })
-        pc.close()
-        This.RTCSession = null
-    }catch (e) {
-        log.error(e)
-    }
 }
 
 /**
@@ -153,7 +125,9 @@ GsRTC.prototype.shareAudio = function(data) {
                 await This.RTCSession.doOffer(pc)
             }else if(args.error){
                 log.error('Get audio stream failed: ' + args.error)
-                data.callback({error: args.error})
+                if(data.callback){
+                    data.callback(This.CODE_TYPE.AUDIO_REFRESH_FAILED)
+                }
             }
         }
 
@@ -164,7 +138,7 @@ GsRTC.prototype.shareAudio = function(data) {
         }
 
         This.action = 'audioRefresh'
-        This.on('audioRefresh', data.callback)
+        This.on(This.action, data.callback)
         This.device.getMedia(conf, constraints)
     }
 }
@@ -202,7 +176,7 @@ GsRTC.prototype.switchAudioSource = function(data) {
             This.RTCSession.setStream(stream, type, true)
         }else {
             log.error(event.error)
-            data.callback({error:event.error})
+            data.callback({error:event.error })
         }
     }
 
@@ -212,8 +186,8 @@ GsRTC.prototype.switchAudioSource = function(data) {
         video: false
     }
 
-    This.action = 'switchAudioSource'
-    This.on('switchAudioSource', data.callback)
+    This.action =  'switchAudioSource'
+    This.on(This.action, data.callback)
     This.device.getMedia(conf, constraints)
 }
 
@@ -233,12 +207,15 @@ GsRTC.prototype.stopShareAudio = function(data) {
         let stream = This.RTCSession.getStream(type, true)
         if(stream){
             This.RTCSession.streamMuteSwitch({stream: stream, type: type, mute: true})
+            if(data.callback){
+                data.callback(This.CODE_TYPE.SUCCESS)
+            }
         }else {
             log.info('Audio stream: null')
         }
     }catch (e) {
         log.error(e.toString())
-        data.callback({error: e})
+        data.callback(This.CODE_TYPE.AUDIO_REFRESH_FAILED)
     }
 }
 
@@ -299,15 +276,15 @@ GsRTC.prototype.shareVideo = function(data) {
 
     let gumData = { streamType: 'video', callback: getMediaCallBack }
     This.action = 'shareVideo'
-    This.on('shareVideo', data.callback)
+    This.on( This.action , data.callback)
     This.device.getMedia(gumData, constraints)
 }
 
 /**
  * 关闭本地视频
- * @param callback 回调函数
+ * @param data
  */
-GsRTC.prototype.stopShareVideo = function(callback) {
+GsRTC.prototype.stopShareVideo = function(data) {
     let This = this
     if(!This.RTCSession){
         log.error('stopShareVideo: invalid RTCSession parameters! ')
@@ -318,18 +295,21 @@ GsRTC.prototype.stopShareVideo = function(callback) {
     let stream = This.RTCSession.getStream(type, true)
     let pc = This.RTCSession.peerConnection
 
-    if(stream){
-        This.action = 'stopShareVideo'
-        This.on('stopShareVideo', callback)
+    This.action = 'stopShareVideo'
+    This.on(This.action, data.callback)
 
-        log.info('clear previous stream')
-        This.RTCSession.deviceId = null
-        This.RTCSession.processRemoveStream(stream, pc, type)
-        This.RTCSession.closeStream(stream)
-        This.RTCSession.setStream(null, type, true)
-        This.RTCSession.doOffer(pc)
-    }else {
-        throw new Error("ERR_INVALID_PARAMETER_VALUE: VIDEO STREAM IS NULL");
+    log.info('clear previous stream')
+    This.RTCSession.deviceId = null
+    This.RTCSession.processRemoveStream(stream, pc, type)
+    This.RTCSession.closeStream(stream)
+    This.RTCSession.setStream(null, type, true)
+    This.RTCSession.setMediaElementStream(null, 'main', 'true')
+    // This.RTCSession.doOffer(pc)
+
+    gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: {value: 0}})
+
+    if(data.callback){
+        data.callback(gsRTC.CODE_TYPE.SUCCESS)
     }
 }
 
@@ -347,10 +327,10 @@ GsRTC.prototype.shareScreen = function(data) {
     }
 
     let type = 'slides'
-    let pc = this.RTCSession.peerConnection
-
-    This.action = 'shareScreen'
-    This.on('shareScreen', data.callback)
+    let pc = This.RTCSession.peerConnection
+    This.action = 'screenShare'
+    This.on(This.action, data.callback)
+    This.sendCtrlPresentation = true
 
     function getMediaCallBack(event){
         if(event.stream){
@@ -365,12 +345,23 @@ GsRTC.prototype.shareScreen = function(data) {
             This.RTCSession.processAddStream(stream, pc, type)
             This.RTCSession.doOffer(pc)
         }else {
-            log.warn('Get present stream failed: ' + event.error)
-            data.callback({error: event.error})
+            log.error('Get present stream failed: ' + event.error)
+            if(data.callback){
+                data.callback(This.CODE_TYPE.PRESENT_ON_FAILED)
+            }
         }
     }
     let gumData = {streamType: 'screenShare', callback: getMediaCallBack}
-    This.device.getMedia(gumData, data.constraints)
+    let constraints = {
+        audio: false,
+        video: {
+            width: {ideal: This.initialResolution.width,},
+            height: {ideal: This.initialResolution.height,},
+            frameRate: {ideal: This.initialResolution.framerate}
+        }
+    };
+    log.info(JSON.stringify(constraints, null, ' '))
+    This.device.getMedia(gumData, constraints)
 }
 
 /**
@@ -390,7 +381,7 @@ GsRTC.prototype.switchScreenSource = function(data) {
     let pc = This.RTCSession.peerConnection
 
     This.action = 'switchScreenSource'
-    This.on('switchScreenSource', data.callback)
+    This.on(This.action, data.callback)
 
     function getMediaCallBack(event){
         if(event.stream){
@@ -403,7 +394,7 @@ GsRTC.prototype.switchScreenSource = function(data) {
             if(previousStream && This.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
                 log.info('use replace track to switch presentation stream')
                 This.RTCSession.processAddStream(stream, pc, type)
-                data.callback({codeType: 999})
+                data.callback({codeType: 200})
             }else {
                 This.RTCSession.processRemoveStream(previousStream, pc)
                 This.RTCSession.processAddStream(stream, pc, type)
@@ -440,16 +431,18 @@ GsRTC.prototype.stopShareScreen = function(data) {
     let stream = This.RTCSession.getStream(type, true)
     let pc = This.RTCSession.peerConnection
 
-    if(stream){
-        This.action = 'stopShareScreen'
-        This.on('stopShareScreen', data.callback)
+    This.action = 'stopShareScreen'
+    This.on(This.action, data.callback)
+    This.sendCtrlPresentation = true
 
-        log.info('clear previous stream')
-        This.RTCSession.processRemoveStream(stream, pc, type)
-        This.RTCSession.closeStream(stream)
-        This.RTCSession.setStream(null, type, true)
-        This.RTCSession.doOffer(pc)
-    }
+    log.info('clear previous stream')
+    This.RTCSession.processRemoveStream(stream, pc, type)
+    This.RTCSession.closeStream(stream)
+    This.RTCSession.setStream(null, type, true)
+    // This.RTCSession.doOffer(pc)
+
+    This.RTCSession.setMediaElementStream(null, 'slides', 'true')
+    This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: This.sharingPermission }})
 }
 
 /**
@@ -506,9 +499,57 @@ GsRTC.prototype.adjustResolution = function(data){
 
     let pc = This.RTCSession.peerConnection
     This.action = 'adjustResolution'
-    This.on('adjustResolution', data.callback)
+    This.on(This.action , data.callback)
     This.setVideoResolution(This.getResolutionByHeight(data.height), 'EXPECT_RECV_RESOLUTION')
     This.RTCSession.doOffer(pc)
 }
 
+/**
+ * end call
+ * @param data
+ */
+GsRTC.prototype.endCall = function(data){
+    let This = this
+    This.action = 'hangup'
+    if( data.callback){
+        This.on(This.action , data.callback)
+    }
 
+    This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.BYE})
+    This.closePeerConn()
+    This.initialResolution = null
+    This.sokect.ws.close()
+
+    if(data.callback){
+        data.callback(gsRTC.CODE_TYPE.SUCCESS)
+    }
+}
+
+/**
+ * Leave the meeting
+ */
+GsRTC.prototype.closePeerConn = function () {
+    let This = this
+    if(!This.RTCSession){
+        log.error("RTCSession is not initialized")
+        return
+    }
+    try {
+        // close stream
+        for (let key in This.MEDIA_STREAMS) {
+            let stream = This.MEDIA_STREAMS[key];
+            this.RTCSession.closeStream(stream)
+        }
+
+        let pc = This.RTCSession.peerConnection
+        // close peerConnection
+        pc.getSenders().forEach(sender => {
+            delete sender.track
+            sender.replaceTrack(null)
+        })
+        pc.close()
+        This.RTCSession = null
+    }catch (e) {
+        log.error(e)
+    }
+}

@@ -17,7 +17,7 @@ GsRTC.prototype.on = function(eventName, callback) {
         this.EVENTS[eventName] = this.EVENTS[eventName] || [];
         this.EVENTS[eventName].push(callback);
     } else {
-        throw 'Provided parameter is not a function'
+        // throw 'Provided parameter is not a function'
     }
 
 };
