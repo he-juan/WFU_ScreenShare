@@ -355,9 +355,9 @@ GsRTC.prototype.shareScreen = function(data) {
     let constraints = {
         audio: false,
         video: {
-            width: {ideal: This.initialResolution.width,},
-            height: {ideal: This.initialResolution.height,},
-            frameRate: {ideal: This.initialResolution.framerate}
+            width: {ideal: This.initialResolution ? This.initialResolution.width ? This.initialResolution.width : 1920 : 1920},
+            height: {ideal: This.initialResolution ? This.initialResolution.height ? This.initialResolution.height : 1080 : 1080},
+            frameRate: {ideal: This.initialResolution ? This.initialResolution.framerate ? This.initialResolution.framerate : 15 : 15}
         }
     };
     log.info(JSON.stringify(constraints, null, ' '))

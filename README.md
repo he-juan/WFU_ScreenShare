@@ -128,7 +128,7 @@
 
 ### 页面端注册事件说明
 
-- gsRTC.on 修改为 addEventHandler
+- gsRTC.on 修改为 addEventHandler，例如：
 
 - web开演示的回调：addEventHandler('shareScreen', shareScreenHandler)
 
@@ -143,6 +143,10 @@
 - gs_phone请求关闭演示: addEventHandler('stopShareScreenRequest', stopShareScreenRequestHandler)
 
 - gs_phone请求结束通话: addEventHandler('hangupRequest', hangupRequestHandler)
+
+
+- shareScreenRequestHandler 或 stopShareScreenRequestHandler调用的时候会传一个 底层的callback(confirm)给你，confirm参数为true表示同意请求，false表示拒绝
+
 
 ----
 
