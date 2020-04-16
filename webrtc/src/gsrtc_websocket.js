@@ -81,8 +81,8 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
     // if(data.rspInfo){
     //     code = data.rspInfo.rspCode;
     // }
-    if(data.errorInfo) {
-        code = data.errorInfo.errorId;
+    if(data.rspInfo) {
+        code = data.rspInfo.rspCode;
     }
     log.info('get code: ' + code)
 
@@ -94,11 +94,11 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
                 log.info(gsRTC.action + ' success')
                 gsRTC.RTCSession.handleRemoteSDP(sdp)
             }else if(gsRTC.isNxx(4, code)){
-                log.error(code + ', ' + data.errorInfo.message)
+                log.error(code + ', ' + data.rspInfo.rspMsg)
                 // log.error(code + ', ' + data.rspInfo.rspMsg)
                 gsRTC.trigger(gsRTC.action, {
                     codeType: code,
-                    message: data.errorInfo.message
+                    message: data.rspInfo.rspMsg
                 });
             }
             break;
@@ -118,7 +118,7 @@ WebSocketInstance.prototype.handleIncomingMessage = function(message){
             log.info('present on request ' + code)
             gsRTC.trigger(gsRTC.action, {
                 codeType: code,
-                message: data.errorInfo.message
+                message: data.rspInfo.rspMsg
             });
             break
         default:
@@ -156,7 +156,10 @@ WebSocketInstance.prototype.sendMessage = function (data) {
         info.sendPermission = data.ctrlPresentation.value
         log.info('send present control message: \n' + JSON.stringify(info))
     }else if(data.ctrlPresentationRet){
-        info.errorInfo = data.errorInfo
+        info.rspInfo = {
+            rspCode: data.ctrlPresentationRet.codeType,
+            rspMsg: data.ctrlPresentationRet.message
+        }
     }
 
     log.warn("ws send message ");
