@@ -328,7 +328,7 @@ GsRTC.prototype.shareScreen = function(data) {
 
     let type = 'slides'
     let pc = This.RTCSession.peerConnection
-    This.action = 'screenShare'
+    This.action = 'shareScreen'
     This.on(This.action, data.callback)
     This.sendCtrlPresentation = true
 

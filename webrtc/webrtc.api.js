@@ -180,7 +180,10 @@ function hangup(callback) {
                     videoInputList.push('<option class="cameraOption" value="' + deviceInfo.cameras[i].deviceId + '">' + deviceInfo.cameras[i].label + '</option>')
                     log.log('camera: ' + deviceInfo.cameras[i].label)
                 }
-                document.getElementById('videoList').innerHTML = videoInputList.join('')
+                let videoList = document.getElementById('videoList')
+                if(videoList){
+                    videoList.innerHTML = videoInputList.join('')
+                }
             }
 
             let audioOutput = deviceInfo.speakers.length > 0 ? deviceInfo.speakers : deviceInfo.microphones
@@ -196,7 +199,10 @@ function hangup(callback) {
                         log.log('speakers: ' + audioOutput[j].label)
                     }
                 }
-                document.getElementById('audioList').innerHTML = audioOutputList.join('')
+                let audioList = document.getElementById('audioList')
+                if(audioList){
+                    audioList.innerHTML = audioOutputList.join('')
+                }
             }
         }, function (error) {
             log.error('enum device error: ' + error)

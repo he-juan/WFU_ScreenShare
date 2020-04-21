@@ -29,7 +29,7 @@ PeerConnection.prototype.handleRemoteSDP  = function(sdp){
         return;
     }
 
-    sdp = This.gsRTC.setXgoogleBitrate(sdp, 4096)
+    sdp = This.gsRTC.setXgoogleBitrate(sdp, 10240)
     sdp = This.modifiedMidBeforeSetRemoteSDP(sdp)
     This.setRemote(sdp)
     This.gsRTC.isSendReInvite = true
