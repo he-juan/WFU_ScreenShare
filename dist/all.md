@@ -285,6 +285,7 @@ if(streamArray && streamArray.length){
 
     - (2) 3XX 错误码
            > 3XX错误码是webRTC的JS层内部的错误码，该错误码的产生和GVC无关，由webRTC的JS层内部自定义。
+
           |  Code     |   Description                                                                       |
           |:----------|:------------------------------------------------------------------------------------|
           |  300      |   webSocket address is not a valid address                        (对应之前的100)   |
@@ -296,20 +297,22 @@ if(streamArray && streamArray.length){
     - (3) 4XX 错误码
 
          > 4XX是请求执行失败的错误码，仅在响应中携带。
+
          |  Code     | Description                                                                                                 |
          |:--------|:--------------------------------------------------------------------------------------------------------------|
          |  400      |  the request is supported, but the paramter format error                                                    |
-         |  403      |  reject to run the request (请求开演示拒绝/请求关演示拒绝/请求挂断拒绝)                                                                                 |
+         |  403      |  reject to run the request (请求开演示拒绝/请求关演示拒绝/请求挂断拒绝)                                          |
          |  405      |  request isn't supported                                                                                     |
          |  408      |  the request run time out, when the request don't receive response, this will created by local autoly        |
          |  481      |  the user isn't in the call                                                                                  |
          |  486      |  device can't provide line to process the call                                                               |
          |  487      |  the user has already in the call                                                                            |
          |  488      |  media infomation error, this error will be created when local can't provide media stream process capability |
-         |  489      |  request canceled                                                                                                    |
+         |  489      |  request canceled                                                                                            |
 
     - (4) 5XX 错误码
          > 5XX错误码仅在请求中携带，该错误码表示发出该请求的原因，一般来说，请求不会携带该错误码。
+
          |  Code     |   Description                                                               |
          |:----------|:----------------------------------------------------------------------------|
          |  501      |   other web browser use the same user name, and replace the call             |
@@ -317,6 +320,7 @@ if(streamArray && streamArray.length){
 
     - (5) 1XX 错误码
          > 1XX错误码仅在响应中携带，该错误表示支持处理相关的请求，但是请求的执行是无效的，即目前已经是执行过相关请求的状态，请求重复。
+
          |Code       |    Description                                                                                          |
          |:----------|:--------------------------------------------------------------------------------------------------------|
          |  104      |   Share screen is being turned on                                                                       |
@@ -338,23 +342,23 @@ if(streamArray && streamArray.length){
 
  1. cancel处理流程
 
-   - <font color =red>针对类别区分场景处理：</font>
-   - 1. 发送`ctrlPresentation`后，用户不点击浏览器【停止共享】按钮
-     - (1) gsPhone没有回复`ctrlPresentationRet`
+     - <font color =red>针对类别区分场景处理：</font>
+     - 1. 发送`ctrlPresentation`后，用户不点击浏览器【停止共享】按钮
+         - (1) gsPhone没有回复`ctrlPresentationRet`
               - 直到超时后gsPhone回复`ctrlPresentationRet`为408;(超时)
-      - (2) gsPhone回复`ctrlPresentationRet`
+         - (2) gsPhone回复`ctrlPresentationRet`
              - 若回复`ctrlPresentationRet`为4xx, 直接关闭流即可;  回复之后清除定时器，当为4xx后重置状态位
              - 若回复`ctrlPresentationRet`为200, 直接进行update流程；
-      注：可能gsPhone可发送cancel过来，如果存在，则需要根据发送cancel和回复的`ctrlPresentationRet`来处理
+         注：可能gsPhone可发送cancel过来，如果存在，则需要根据发送cancel和回复的`ctrlPresentationRet`来处理
              - 回复`ctrlPresentationRet`为4XX
                  -  如果gsPhone先发cancel后回复 `ctrlPresentationRet` ,可根据`ctrlPresentationRet`或者回复的`cancelRequest`去清除 状态；
                  -  如果gsPhone先回复`ctrlPresentationRet` 后发送cancel，则根据回复的`cancelRequest`去清除 状态
              - 回复`ctrlPresentationRet`为200，直接走update流程；
 
-   - 2. 发送`ctrlPresentation`后，用户点击浏览器【停止共享】按钮
-      - 2.1 gsPhone没有回复`ctrlPresentationRet`
+     - 2. 发送`ctrlPresentation`后，用户点击浏览器【停止共享】按钮
+         - 2.1 gsPhone没有回复`ctrlPresentationRet`
              - 用户点击后,webUI 发送`cancelRequest`,gsPhone回复`ctrlPresentationRet`为489（表示取消请求）且回复`cancelRequestRet`为200；
-      - 2.2 gsPhone回复`ctrlPresentationRet`
+         - 2.2 gsPhone回复`ctrlPresentationRet`
              - (1) 此时开启演示未成功（openSharing字段）（可不要）(此时回复只能是4xx)
                   - 若回复`ctrlPresentationRet`为4xx 且用户点击后发送了`cancelRequest`;(这个要看先后顺序)
                       - 若gsPhone先回复`ctrlPresentationRet` 后webUI发送`cancelRequest`,则在回复错误码为4xx时已经处理了关闭流；则在回复`cancelRequestRet`时清除状态
