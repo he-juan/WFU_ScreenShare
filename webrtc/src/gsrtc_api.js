@@ -10,9 +10,10 @@ log.error = window.debug("GSRTC_API:ERROR");
  * WebRTC API Instance
  * @constructor
  */
-let GsRTC = function (options) {
+var GsRTC = function (options) {
     this.sokect = null
     this.RTCSession = null
+
     this.EVENTS = []
     // 上层注册事件
     this.handlerFuns = []
@@ -20,15 +21,13 @@ let GsRTC = function (options) {
     this.conf = options;
     this.sessionVersion = 0
     this.action = null
-    this.isSendReInvite = false            // 判断是否为re-invite
-    this.sendCtrlPresentation = false      // 判断是否需要发送ctrlPresentation控制信令
-    this.sharingPermission = 0             // 标记共享命令：1开启 0关闭
-    this.mLineOrder = []                   // 记录m行的顺序
     this.serverAction = null
-    this.initialResolution = null
+    this.shareScreenStream = null                          // 共享桌面流
+
 
     this.device = new MediaDevice()
     this.eventBindings()
+    this.trigger()
 }
 
 window.onload = function () {
@@ -86,15 +85,14 @@ GsRTC.prototype.inviteCall = function (data) {
     let This = this
     This.conf = {
         userName: 'webRTC_Client',
-        // initialResolution : This.getScreenResolution()
     }
     This.action = 'call'
-    This.on(This.action, data.callback)
-
+    if(data && data.callback && !This.EVENTS[This.action]){
+        This.on(This.action, data.callback)
+    }
     This.RTCSession = new PeerConnection(This)
     This.RTCSession.createMultiStreamRTCSession(This.conf)
 }
-
 /**
  * share local audio
  * @param data
@@ -138,7 +136,9 @@ GsRTC.prototype.shareAudio = function(data) {
         }
 
         This.action = 'audioRefresh'
-        This.on(This.action, data.callback)
+        if(data && data.callback ){
+            This.on(This.action, data.callback)
+        }
         This.device.getMedia(conf, constraints)
     }
 }
@@ -165,7 +165,9 @@ GsRTC.prototype.switchAudioSource = function(data) {
             let stream = event.stream
             if(previousStream && This.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
                 This.RTCSession.processAddStream(stream, pc, type)
-                data.callback({codeType: 200})
+                if(data && data.callback){
+                    data.callback({codeType: 200})
+                }
             }else {
                 log.info('clear previous stream')
                 This.RTCSession.processRemoveStream(previousStream, pc, type)
@@ -176,7 +178,9 @@ GsRTC.prototype.switchAudioSource = function(data) {
             This.RTCSession.setStream(stream, type, true)
         }else {
             log.error(event.error)
-            data.callback({error:event.error })
+            if(data && data.callback ){
+                data.callback({error:event.error })
+            }
         }
     }
 
@@ -187,7 +191,9 @@ GsRTC.prototype.switchAudioSource = function(data) {
     }
 
     This.action =  'switchAudioSource'
-    This.on(This.action, data.callback)
+    if(data && data.callback){
+        This.on(This.action, data.callback)
+    }
     This.device.getMedia(conf, constraints)
 }
 
@@ -215,7 +221,9 @@ GsRTC.prototype.stopShareAudio = function(data) {
         }
     }catch (e) {
         log.error(e.toString())
-        data.callback(This.CODE_TYPE.AUDIO_REFRESH_FAILED)
+        if(data && data.callback){
+            data.callback(This.CODE_TYPE.AUDIO_REFRESH_FAILED)
+        }
     }
 }
 
@@ -246,6 +254,7 @@ GsRTC.prototype.shareVideo = function(data) {
     }
     let constraints = This.device.getConstraints(param)
 
+
     function getMediaCallBack(event){
         if(event.stream){
             log.info('get stream success')
@@ -265,18 +274,29 @@ GsRTC.prototype.shareVideo = function(data) {
             This.RTCSession.closeStream(previousStream)
             This.RTCSession.setStream(stream, type, true)
 
+            /**获取远端流**/
+            if(gsRTC.RTCSession.peerConnection.getReceivers()[1].track){
+                let streams  = new MediaStream()
+                streams.addTrack(gsRTC.RTCSession.peerConnection.getReceivers()[1].track)
+                This.RTCSession.setStream(streams, type, false)
+            }
+
             This.RTCSession.deviceId = data.deviceId  // save deviceId
             This.setVideoResolution({width: param.width, height: param.height}, 'CURRENT_UP_RESOLUTION')
         }else {
             log.info('get stream failed')
-            data.callback({error: event.error})
+            if(data && data.callback ){
+                data.callback({error: event.error})
+            }
             log.error(event.error)
         }
     }
 
     let gumData = { streamType: 'video', callback: getMediaCallBack }
     This.action = 'shareVideo'
-    This.on( This.action , data.callback)
+    if(data && data.callback ){
+        This.on(This.action, data.callback)
+    }
     This.device.getMedia(gumData, constraints)
 }
 
@@ -296,7 +316,9 @@ GsRTC.prototype.stopShareVideo = function(data) {
     let pc = This.RTCSession.peerConnection
 
     This.action = 'stopShareVideo'
-    This.on(This.action, data.callback)
+    if(data && data.callback ){
+        This.on(This.action, data.callback)
+    }
 
     log.info('clear previous stream')
     This.RTCSession.deviceId = null
@@ -308,7 +330,7 @@ GsRTC.prototype.stopShareVideo = function(data) {
 
     gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: {value: 0}})
 
-    if(data.callback){
+    if(data && data.callback){
         data.callback(gsRTC.CODE_TYPE.SUCCESS)
     }
 }
@@ -320,48 +342,39 @@ GsRTC.prototype.stopShareVideo = function(data) {
  * data.callback
  */
 GsRTC.prototype.shareScreen = function(data) {
+    log.info("share screen")
     let This = this
     if(!This.RTCSession){
         log.error('shareScreen: invalid RTCSession parameters! ')
         return
     }
 
-    let type = 'slides'
-    let pc = This.RTCSession.peerConnection
     This.action = 'shareScreen'
-    This.on(This.action, data.callback)
-    This.sendCtrlPresentation = true
 
-    function getMediaCallBack(event){
-        if(event.stream){
-            log.info('get stream success, ' + event.stream.id)
-            let stream = event.stream
-            stream.oninactive= function () {
-                log.warn("user clicks the bottom share bar to stop sharing")
-                stopScreen()
-            }
-
-            This.RTCSession.setStream(stream, type, true)
-            This.RTCSession.processAddStream(stream, pc, type)
-            This.RTCSession.doOffer(pc)
-        }else {
-            log.error('Get present stream failed: ' + event.error)
-            if(data.callback){
-                data.callback(This.CODE_TYPE.PRESENT_ON_FAILED)
-            }
-        }
+    if(data && data.callback &&  !This.EVENTS[This.action]){
+        This.on(This.action, data.callback)
     }
-    let gumData = {streamType: 'screenShare', callback: getMediaCallBack}
-    let constraints = {
-        audio: false,
-        video: {
-            width: {ideal: This.initialResolution ? This.initialResolution.width ? This.initialResolution.width : 1920 : 1920},
-            height: {ideal: This.initialResolution ? This.initialResolution.height ? This.initialResolution.height : 1080 : 1080},
-            frameRate: {ideal: This.initialResolution ? This.initialResolution.framerate ? This.initialResolution.framerate : 15 : 15}
+
+    log.info('current sharing permission: ' + This.RTCSession.sharingPermission)
+    if( This.RTCSession.sharingPermission === 3){
+        if(This.RTCSession.timeBox){
+            clearInterval(This.RTCSession.timeBox)
+            This.RTCSession.timeBox = null
         }
-    };
-    log.info(JSON.stringify(constraints, null, ' '))
-    This.device.getMedia(gumData, constraints)
+        This.RTCSession.openSharingTimeoutstartTime = null
+        This.RTCSession.openSharingTimestamp = null
+        This.RTCSession.sendCtrlPresentation = false
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: This.CODE_TYPE.SUCCESS, reqId:  This.RTCSession.reqId})
+        This.RTCSession.openSharing = true
+        let stream = This.MEDIA_STREAMS.LOCAL_PRESENT_STREAM
+        let pc = This.RTCSession.peerConnection
+        log.info('prepare do offer!')
+        This.RTCSession.processAddStream(stream, pc, 'slides')
+        This.RTCSession.doOffer(pc)
+    }else{
+        This.RTCSession.sharingPermission = 1
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: This.RTCSession.sharingPermission,reqId: This.RTCSession.reqId}} )
+    }
 }
 
 /**
@@ -381,7 +394,10 @@ GsRTC.prototype.switchScreenSource = function(data) {
     let pc = This.RTCSession.peerConnection
 
     This.action = 'switchScreenSource'
-    This.on(This.action, data.callback)
+    if(data && data.callback ){
+        This.on(This.action, data.callback)
+    }
+    This.RTCSession.setMediaElementStream(null, 'slides', 'true')
 
     function getMediaCallBack(event){
         if(event.stream){
@@ -390,11 +406,21 @@ GsRTC.prototype.switchScreenSource = function(data) {
                 log.warn("user clicks the bottom share bar to stop sharing.")
                 stopScreen()
             }
+            if (gsRTC.getBrowserDetail().browser === 'firefox') {
+                let tracks = stream.getVideoTracks();
+                tracks[0].onended = function () {
+                    log.warn('track: user close share control bar');
+                    stopScreen()
+                }
+            }
 
             if(previousStream && This.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
                 log.info('use replace track to switch presentation stream')
                 This.RTCSession.processAddStream(stream, pc, type)
-                data.callback({codeType: 200})
+
+                if(data &&data.callback){
+                    data.callback({codeType: 200})
+                }
             }else {
                 This.RTCSession.processRemoveStream(previousStream, pc)
                 This.RTCSession.processAddStream(stream, pc, type)
@@ -405,7 +431,9 @@ GsRTC.prototype.switchScreenSource = function(data) {
             This.RTCSession.setStream(stream, type, true)
         }else {
             log.error(event.error.toString())
-            data.callback({error: event.error})
+            if(data && data.callback){
+                data.callback({error: event.error})
+            }
         }
     }
 
@@ -432,8 +460,9 @@ GsRTC.prototype.stopShareScreen = function(data) {
     let pc = This.RTCSession.peerConnection
 
     This.action = 'stopShareScreen'
-    This.on(This.action, data.callback)
-    This.sendCtrlPresentation = true
+    if(data && data.callback && !This.EVENTS[This.action]){
+        This.on(This.action, data.callback)
+    }
 
     log.info('clear previous stream')
     This.RTCSession.processRemoveStream(stream, pc, type)
@@ -441,8 +470,17 @@ GsRTC.prototype.stopShareScreen = function(data) {
     This.RTCSession.setStream(null, type, true)
     // This.RTCSession.doOffer(pc)
 
-    This.RTCSession.setMediaElementStream(null, 'slides', 'true')
-    This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: This.sharingPermission }})
+    log.info('current sharing permission: ' + This.RTCSession.sharingPermission)
+    if(This.RTCSession.sharingPermission === 2){
+        This.RTCSession.sendCtrlPresentation = false
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: This.CODE_TYPE.SUCCESS, reqId: This.RTCSession.reqId})
+        This.openSharing = false
+        This.trigger(This.action, {codeType:This.CODE_TYPE.SUCCESS.codeType});
+    }else if(This.RTCSession.sharingPermission === 0){
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: This.RTCSession.sharingPermission }})
+    }
+
+
 }
 
 /**
@@ -499,7 +537,9 @@ GsRTC.prototype.adjustResolution = function(data){
 
     let pc = This.RTCSession.peerConnection
     This.action = 'adjustResolution'
-    This.on(This.action , data.callback)
+    if(data && data.callback ){
+        This.on(This.action , data.callback)
+    }
     This.setVideoResolution(This.getResolutionByHeight(data.height), 'EXPECT_RECV_RESOLUTION')
     This.RTCSession.doOffer(pc)
 }
@@ -511,17 +551,17 @@ GsRTC.prototype.adjustResolution = function(data){
 GsRTC.prototype.endCall = function(data){
     let This = this
     This.action = 'hangup'
-    if( data.callback){
+    if( data && data.callback && !This.EVENTS[This.action] ){
         This.on(This.action , data.callback)
     }
+    log.info('current sharing permission: ' + This.RTCSession.sharingPermission)
+    if(This.RTCSession.sharingPermission === 4){
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.BYE_RET, destroyMediaSessionRet: This.CODE_TYPE.SUCCESS, reqId: This.RTCSession.reqId})
+        This.trigger(This.action, {codeType:This.CODE_TYPE.SUCCESS.codeType});
+        This.cleanGsRTC()
 
-    This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.BYE})
-    This.closePeerConn()
-    This.initialResolution = null
-    This.sokect.ws.close()
-
-    if(data.callback){
-        data.callback(gsRTC.CODE_TYPE.SUCCESS)
+    }else{
+        This.sokect.sendMessage({type: This.SIGNAL_EVENT_TYPE.BYE,destroyMediaSession:{ value: This.RTCSession.sharingPermission }})
     }
 }
 
@@ -538,7 +578,7 @@ GsRTC.prototype.closePeerConn = function () {
         // close stream
         for (let key in This.MEDIA_STREAMS) {
             let stream = This.MEDIA_STREAMS[key];
-            this.RTCSession.closeStream(stream)
+            This.RTCSession.closeStream(stream)
         }
 
         let pc = This.RTCSession.peerConnection
@@ -552,4 +592,36 @@ GsRTC.prototype.closePeerConn = function () {
     }catch (e) {
         log.error(e)
     }
+}
+
+/**
+ * close websocket
+ */
+GsRTC.prototype.cleanGsRTC = function(){
+    log.info("websocket close")
+    let This = this
+    if(!This.RTCSession){
+        log.error("RTCSession is not initialized")
+        return
+    }
+    let stream = This.MEDIA_STREAMS.LOCAL_PRESENT_STREAM
+    if(stream){
+        This.RTCSession.stopTrack(stream)
+    }
+    if( (This.sokect && This.sokect.ws && This.sokect.ws.readyState === 1)){
+        This.sokect.ws.close()
+    }
+    clearInterval(This.sokect.ws.websocketTimer)
+    This.RTCSession.openSharingTimestamp = null
+    This.RTCSession.openSharingTimeoutstartTime = null
+    This.RTCSession.initialResolution = null
+    This.RTCSession.shareScreenStream = null
+    This.RTCSession.openSharing = false
+    This.RTCSession.isSendReInvite = false
+    This.RTCSession.sendCtrlPresentation = false
+    This.RTCSession.reqId = null
+    This.RTCSession.cancelReqCmd = null
+    This.RTCSession.cancelReqId = null
+    This.RTCSession.sharingPermission = null
+    This.closePeerConn()
 }

@@ -1,171 +1,205 @@
+## Browser compatibility
 
+| Browser |  Edge | Chrome | Opera |  Firefox  |  Safari   |
+|:-------:|:-----:|:------:|:-----:|:---------:|:---------:|
+| Version |  79+  |  72+   | 60+   |  60+      | 13.0+     |
 
-### 浏览器支持版本
+注： 强制要求 `Https`。因为 webRTC 取流接口在非安全环境下无法访问，无法取流。
 
-- Chrome 72+ 
-- Opera 60+
-- Firefox 33+
-- Safari 13+
+---
 
-> 说明：
-> 1、getDisplayMedia 接口，72版本开始支持。以上版本主要为unified-plan支持版本。
-> 2、针对不支持getDisplayMedia的浏览器，WFU不做支持
-> 3、使用该时必须使用HTTPS，因为webRTC的接口在非https下，无法访问。
+## 对外接口说明
 
-----
+1、preInit()
 
-### webRTC 码率控制
-
-参数：
-
-- b=AS
-- b=TIAS
-- google私有字段：x-google-min-bitrate、x-google-start-bitrate、x-google-max-bitrate等
-
-> webRTC 发送的码率由gs_phone能力决定。如果gs_phone没有携带控制带宽的参数，webRTC会发送比较低的码率。
-> ~~gs_phone 根据web端携带情况添加b行，web端需携带b行参数，web且为了兼容不同浏览器，需同时携带b=AS、b=TIAS~~
-> gs_phone 不支持x-google字段，webRTC收到sdp添加x-google等字段控制码率
-
------
-
-### mid 和content 说明
-
-- audio
-    - a=mid:0
-- main
-    - a=mid:1
-    - a=content:main
-- slides
-    - a=mid:2
-    - a=content:slides
-- gui
-    - a=mid:3
-    - a=content:gui
-
-
-> 通过mid标识媒体行，content区分主流、演示流、gui视频流
+- 初始化 GsRTC 参数
 
 ----
 
-#### mid 注意事项
+2、建立通话
 
-- offer answer中每个m行的mid需对应，例如：offer audio mid=0，answer audio mid=0
+- call(wsAddr, callback)
+- 和gs_phone 建立呼叫
+- 参数
+    + wsAddr： ws连接地址，例：ws://192.168.131.172:10200
+    + callback(codeType)： 回调函数。codeType=200时表示成功，其他表示失败
 
-- offer answer中每个m行顺序需要一致，如offer audio为第一个m行，answer中的audio也需要在第一个m行
+---
 
-- 需要保存一开始offer中。各个m行的顺序
+3、开启屏幕共享
 
-> 发送invite之前，修改自己的sdp，调整m位置，保持audio在第一个m行。收到对端的sdp后，setRemoteDescription之前，需要修改mid，与offer端创建出来的mid保持一致。
+- beginScreen(callback)
+- 开启屏幕共享
+- 参数
+    - callback：回调函数。参数codeType=200 表示开演示成功，其他表示失败
 
+---
 
-### 功能描述
-   
-#### web 端
-1、建立通话：
-    - 通过 createMediaSession 交换sdp（类似INVITE），建立点对点连接
-       +  Web->GsPhone ：createMediaSession
-       +  GsPhone->Web：createMediaSessionRet
-    
-    
-2、开演示：
-    - 通过 updateMediaSession 交换sdp（类似RE-INVITE）,sdp处理完成后，再发送 ctrlPresentation 信令，告知gs_phone开启发送演示流
-         +  Web->GsPhone ：updateMediaSession
-         +  GsPhone->Web：updateMediaSessionRet 
-         +  Web->GsPhone ：ctrlPresentation
-         +  GsPhone->Web：ctrlPresentationRet 
-        
-    
-3、暂停演示：
-   - 通过操作track enabled 属性实现静音和非静音切换，信令上不做任何操作
+4、暂停演示
 
+- pausePresent(isMute, callback)
+- 共享过程中暂停演示或恢复演示
+- 参数
+    + isMute: true 表示暂停，false 表示回复演示。
+    + callback：回调函数，参数为codeType=200时表示成功，其他表示失败。
 
-4、关演示：
-    - 发送 ctrlPresentation 信令告知 gs_phone关闭演示，webRTC端不重新协商sdp。关闭演示后删除PC中的演示流
-        +  Web->GsPhone ：ctrlPresentation
-        +  GsPhone->Web：ctrlPresentationRet 
+---
 
+5、停止桌面共享
 
-5、结束通话：
-    - 通过 destoryMediaSession 结束通话，关闭peerConnection，关闭webSocket连接
-        + Web->GsPhone: destoryMediaSession
-    
-----
+- stopScreen(callback)
+- 停止桌面共享。
+- 参数说明：
+    + callback：回调函数，参数codeType=200时表示成功，其他表示失败。
 
-#### gs_phone
+---
 
-1、请求开启演示
-    - 通过 ctrlPresentation 请求开启演示
-         +  GsPhone->Web：ctrlPresentation 
-    - 允许开启：
-         +  Web->GsPhone ：updateMediaSession
-         +  GsPhone->Web：updateMediaSessionRet 
-         +  Web->GsPhone ：ctrlPresentationRet
-    - 拒绝开启：
-         + Web->GsPhone ：ctrlPresentationRet
+6、结束通话
 
-2、请求关闭演示：
-    - 通过 ctrlPresentation 请求关闭演示
-         +  GsPhone->Web：ctrlPresentation 
-    - 允许关闭：
-        + 还需要再发送一次 ctrlPresentation 来关闭吗？[思考]
-        + Web->GsPhone ：ctrlPresentationRet
-    - 拒绝关闭：
-        + Web->GsPhone ：ctrlPresentationRet
-
-----
-  
-#### 逻辑说明
-
-- invite 或 re-invite
-    + 收到4xx时直接调用回调
-    + 收到2xx时，setRemoteDescriptionSuccess后判断是否需要发送 ctrlPresentation：
-        - 需要：发送ctrlPresentation，收到ctrlPresentationRet调用回调
-        - 不需要：直接调用回调
+- hangUP(callback)
+- 结束通话
+- 参数
+    + callback：回调函数
 
 
+## 注册事件说明
 
------
+1、web开演示的回调
+```
+window.gsRTC.on('shareScreen', (res) => {
+    console.log('BEGIN_SCREEN ************************')
+})
+```
 
-### 页面端注册事件说明
+2、web关闭演示的回调
+```
+window.gsRTC.on('stopShareScreen', (res) => {
+  console.log('STOP_SCREEN ************************')
+})
+```
 
-- gsRTC.on 修改为 addEventHandler，例如：
+3、web暂停演示
+```
+window.gsRTC.on('pauseShareScreen', (res) => {
+  console.log('pauseShareScreen ************************')
+})
+```
 
-- web开演示的回调：addEventHandler('shareScreen', shareScreenHandler)
+4、web结束通话
+```
+window.gsRTC.on('hangup', (res) => {
+  console.log('hangup ************************')
+})
+```
 
-- web暂停演示：addEventHandler('pauseShareScreen', pauseShareScreenHandler)
+5、gs_phone请求开启演示
+```
+window.gsRTC.on('shareScreenRequest', (res) => {
+  console.log('shareScreenRequest ************************')
+})
+```
 
-- web关闭演示的回调：addEventHandler('stopShareScreen', stopShareScreenHandler)
+6、gs_phone请求关闭演示
+```
+window.gsRTC.on('stopShareScreenRequest', (res) => {
+  console.log('stopShareScreenRequest ************************')
+})
+```
 
-- web结束通话: addEventHandler('hangup', hangupHandler)
-
-- gs_phone请求开启演示: addEventHandler('shareScreenRequest', shareScreenRequestHandler)
-
-- gs_phone请求关闭演示: addEventHandler('stopShareScreenRequest', stopShareScreenRequestHandler)
-
-- gs_phone请求结束通话: addEventHandler('hangupRequest', hangupRequestHandler)
-
-
-- shareScreenRequestHandler 或 stopShareScreenRequestHandler调用的时候会传一个 底层的callback(confirm)给你，confirm参数为true表示同意请求，false表示拒绝
-
-
-----
-
-### 待处理
-
-- 要通过初始invite获取演示的分辨率和帧率
-
-
-----
-
-### 注意事项
-
-- ~~gs_phone为对称协商，携带的分辨率根据webRTC 能力决定，对于webRTC没有携带的字段，gs_phone认为是不支持的~~   已修改为非对称协商，因为浏览器只支持非对称
+7、gs_phone请求结束通话
+```
+window.gsRTC.on('hangupRequest', (res) => {
+  console.log('hangupRequest ************************')
+})
+```
 
 
-----
-### FAQ
+## 错误码说明
 
-- 开演示发送 updateMediaSession 和 ctrlPresentation，并处理成功后，遇到ice failed，再次重新updateMediaSession，没有发送ctrlPresentation，此时gs_phone不显示演示流 [待处理]
+  - 1.错误码说明(GVC3220_Beta)
 
-- 信令交互设计里面，没有带action标识本次请求做的事情[应该优化]
+        |   classification   | Code      | Description                                                                                       |
+        |:-------------------|:----------|:--------------------------------------------------------------------------------------------------|
+        |  共有错误码         |           |                                                                                                   |
+        |                    |  200      |  operate success                                                                                  |
+        |                    |  408      |  open shareScreen timeout                                                                         |
+        |  上层错误码         |           |                                                                                                   |
+        |                    |  100      |  webSocket address is not a valid address                                                         |
+        |                    |  301      |  The current browser version does not support Screen share                                        |
+        |                    |  403      |  refuse to shareScreen    (cancel shareScreen)                                                    |
+        |                    |  405      |  the call in Hold status  (refuse to shareScreen)                                                 |
+        |                    |  488      |  Media information ERROR                                                                          |
+        |                    |  466      |  Websocket automatically disconnected                                                             |
+        |  底层错误码         |           |                                                                                                   |
+        |                    |  104      |  Share screen is being turned on                                                                  |
+        |                    |  105      |  Stop Share Screen is being turned on                                                             |
+        |                    |  106      |  Reject shareScreen or stopShareScreen request again after replying to the signaling              |
+        |                    |  201      |  Present turn On Request denied                                                                   |
+        |                    |  202      |  Present turn Off Request denied                                                                  |
+        |                    |  203      |  hang up Request denied                                                                           |
 
+     - 错误说明：
+          - 底层错误码情况：
+              - 若错误码为2XX,表示此信令为正常处理；
+              - 若错误码为4XX,表示此信令为异常处理；
+              - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
+
+
+  - 2.修改后错误码说明（GVC3220）
+     - (1) 2XX 错误码
+          > 2XX错误码均代表请求执行成功，仅在响应中携带。
+
+           |Code   | Description   |
+           |:------|:--------------|
+           |200    | 请求执行成功    |
+
+     - (2) 3XX 错误码
+            > 3XX错误码是webRTC的JS层内部的错误码，该错误码的产生和GVC无关，由webRTC的JS层内部自定义。
+
+           |  Code     |   Description                                                                       |
+           |:----------|:------------------------------------------------------------------------------------|
+           |  300      |   webSocket address is not a valid address                        (对应之前的100)    |
+           |  301      |   The current browser version does not support Screen share                         |
+           |  302      |   Websocket automatically disconnected                           (对应之前的466)     |
+           |  303      |   refuse to shareScreen                        (cancel shareScreen，对应之前的403)   |
+           |  308      |   open shareScreen timeout                                       （对应之前的408）    |
+
+     - (3) 4XX 错误码
+
+          > 4XX是请求执行失败的错误码，仅在响应中携带。
+
+          |  Code     | Description                                                                                                 |
+          |:--------|:--------------------------------------------------------------------------------------------------------------|
+          |  400      |  the request is supported, but the paramter format error                                                    |
+          |  403      |  reject to run the request (请求开演示拒绝/请求关演示拒绝/请求挂断拒绝)                                           |
+          |  405      |  request isn't supported                                                                                     |
+          |  408      |  the request run time out, when the request don't receive response, this will created by local autoly        |
+          |  481      |  the user isn't in the call                                                                                  |
+          |  486      |  device can't provide line to process the call                                                               |
+          |  487      |  the user has already in the call                                                                            |
+          |  488      |  media infomation error, this error will be created when local can't provide media stream process capability |
+          |  489      |  request canceled                                                                                            |
+
+     - (4) 5XX 错误码
+          > 5XX错误码仅在请求中携带，该错误码表示发出该请求的原因，一般来说，请求不会携带该错误码。
+
+          |  Code     |   Description                                                               |
+          |:----------|:----------------------------------------------------------------------------|
+          |  501      |   other web browser use the same user name, and replace the call            |
+          |  502      |   device need more line, and hangUp the call with the browser               |
+
+     - (5) 1XX 错误码
+          > 1XX错误码仅在响应中携带，该错误表示支持处理相关的请求，但是请求的执行是无效的，即目前已经是执行过相关请求的状态，请求重复。
+
+          |Code       |    Description                                                                                          |
+          |:----------|:--------------------------------------------------------------------------------------------------------|
+          |  104      |   Share screen is being turned on                                                                       |
+          |  105      |   Share Screen is being turned off                                                                      |
+          |  106      |   No stream or Reject shareScreen or stopShareScreen request again after replying to the signaling      |
+
+
+     - 错误说明：
+           - 底层错误码情况：
+               - 若错误码为2XX,表示此信令为正常处理；
+               - 若错误码为4XX,表示此信令为异常处理；
+               - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）

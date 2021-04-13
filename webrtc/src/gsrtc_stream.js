@@ -21,12 +21,7 @@ PeerConnection.prototype.closeStream = function(stream){
 
     try {
         stream.oninactive = null;
-        let tracks = stream.getTracks();
-        for (let track in tracks) {
-            tracks[track].onended = null;
-            log.info("close stream");
-            tracks[track].stop();
-        }
+        gsRTC.RTCSession.stopTrack(stream)
     }
     catch (error) {
         log.info('closeStream: Failed to close stream');
@@ -34,7 +29,6 @@ PeerConnection.prototype.closeStream = function(stream){
     }
     stream = null;
 }
-
 /**
  * Bind page media elements after streaming successfully
  * @param type
@@ -65,18 +59,20 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
             if(stream.getAudioTracks().length > 0){
                 identify = prefix + 'Audio'
             }else if(stream.getVideoTracks().length > 0){
-                if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
+                if(!gsRTC.HTML_MEDIA_ELEMENT[prefix + 'Video'].srcObject){
                     identify = prefix + 'Video'
-                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
+                }else if(!gsRTC.HTML_MEDIA_ELEMENT[prefix + 'PresentVideo'].srcObject){
                     identify = prefix + 'PresentVideo'
-                }else if(!this.gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
+                }else if(!gsRTC.HTML_MEDIA_ELEMENT[prefix + 'VideoShare'].srcObject){
                     identify = prefix + 'VideoShare'
                 }
             }
             break
         default:
             break;
+
     }
+
 
     // Fires when video metadata loading is complete (displays the current video resolution)
     function displayVideoDimensions(e) {
@@ -87,7 +83,7 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
         }
     }
 
-    let target = this.gsRTC.HTML_MEDIA_ELEMENT[identify]
+    let target = gsRTC.HTML_MEDIA_ELEMENT[identify]
     if (target) {
         target.srcObject = stream;
         log.info('Get ' + identify +' stream');
@@ -98,6 +94,7 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     }
 }
 
+
 /**
  * get type by stream id
  * 不支持addTransceiver的浏览器无法判断收到的流的类型，只能判断是audio还是video
@@ -106,7 +103,7 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
  */
 PeerConnection.prototype.getTypeByStreamId = function(streamId){
     let type
-    for(let key in this.gsRTC.MEDIA_STREAMS){
+    for(let key in gsRTC.MEDIA_STREAMS){
         if(gsRTC.MEDIA_STREAMS[key] && gsRTC.MEDIA_STREAMS[key].id === streamId){
             type = key
         }
@@ -219,7 +216,7 @@ PeerConnection.prototype.setStream = function(stream, type, isLocal){
             if(stream.getAudioTracks().length > 0){
                 streamType = 'LOCAL_AUDIO_STREAM'
             }else if(stream.getVideoTracks().length > 0){
-                if(!this.gsRTC.MEDIA_STREAMS['LOCAL_VIDEO_STREAM']){
+                if(!gsRTC.MEDIA_STREAMS['LOCAL_VIDEO_STREAM']){
                     streamType = 'LOCAL_VIDEO_STREAM'
                 }else {
                     streamType = 'LOCAL_PRESENT_STREAM'
@@ -229,7 +226,7 @@ PeerConnection.prototype.setStream = function(stream, type, isLocal){
             if(stream.getAudioTracks().length > 0){
                 streamType = 'REMOTE_AUDIO_STREAM'
             }else if(stream.getVideoTracks().length > 0){
-                if(!this.gsRTC.MEDIA_STREAMS['REMOTE_VIDEO_STREAM']){
+                if(!gsRTC.MEDIA_STREAMS['REMOTE_VIDEO_STREAM']){
                     streamType = 'REMOTE_VIDEO_STREAM'
                 }else {
                     streamType = 'REMOTE_PRESENT_STREAM'
@@ -239,7 +236,7 @@ PeerConnection.prototype.setStream = function(stream, type, isLocal){
     }
 
     log.info('set ' + streamType + ' stream id: ' + streamId)
-    this.gsRTC.MEDIA_STREAMS[streamType] = stream
+    gsRTC.MEDIA_STREAMS[streamType] = stream
 
     if(stream){
         this.setMediaElementStream(stream, type, isLocal)
@@ -259,7 +256,7 @@ PeerConnection.prototype.getStream = function(type, isLocal){
     }
 
     let streamType = this.getStreamType(type, isLocal)
-    let stream = this.gsRTC.MEDIA_STREAMS[streamType]
+    let stream = gsRTC.MEDIA_STREAMS[streamType]
 
     if(stream){
         log.info('get ' + streamType + ' stream id :' + stream.id)
@@ -327,32 +324,38 @@ PeerConnection.prototype.streamMuteSwitch = function(data){
 PeerConnection.prototype.processAddStream = function (stream, pc, type) {
     log.info('process add stream')
     let This = this
+    let mid =  gsRTC.getOriginalMid(type)
+    let transceiverTarget
+    pc.getTransceivers().map(function (item) {
+        if(item.mid == mid){
+            transceiverTarget = item
+        }
+    })
 
-    let mid =  This.gsRTC.getOriginalMid(type)
-    if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
+    if(gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */
-            pc.getTransceivers()[mid].direction = 'sendonly';
-            pc.getTransceivers()[mid].direction = 'inactive';
-
-            pc.getSenders()[mid].replaceTrack(stream.getTracks()[0])
-              .then(function () {
-                  log.info('use replaceTrack to add stream ');
-              })
-              .catch(function (error) {
-                  console.error(error)
-                  log.error(error.toString());
-              });
-            pc.getTransceivers()[mid].direction = 'sendrecv';
+            transceiverTarget.direction = 'sendonly';
+            transceiverTarget.direction = 'inactive';
+            let track = (type === 'audio') ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0]
+            transceiverTarget.sender.replaceTrack(track)
+                .then(function () {
+                    log.info('use replaceTrack to add stream ');
+                })
+                .catch(function (error) {
+                    console.error(error)
+                    log.error(error.toString());
+                });
+            transceiverTarget.direction = 'sendrecv';
         }else{
             log.info('use replaceTrack to add stream ');
-            pc.getTransceivers()[mid].setDirection('sendrecv');
+            transceiverTarget.setDirection('sendrecv');
         }
     }else {
         /** see bug 137445 for safari 11.0.2 and 11.1.2 * */
-        let browserDetail = This.gsRTC.getBrowserDetail()
-        if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2") && pc.getSenders().length > 0){
-            pc.getSenders()[mid].replaceTrack(stream.getTracks()[0])
+        let browserDetail = gsRTC.getBrowserDetail()
+        if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2" ) && transceiverTarget){
+            transceiverTarget.sender.replaceTrack(stream.getTracks()[0])
                 .then(function () {
                     log.info('use replaceTrack to add stream ');
                 })
@@ -376,15 +379,22 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
     let This = this
     log.info('process remove stream')
 
-    let mid =  This.gsRTC.getOriginalMid(type)
-    if(This.gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
+    let mid = gsRTC.getOriginalMid(type)
+    let transceiverTarget
+    pc.getTransceivers().forEach(function (item) {
+        if(mid == item.mid){
+            transceiverTarget = item
+        }
+    })
+
+    if(gsRTC.isReplaceTrackSupport() && pc.getTransceivers().length > 0){
         if (!RTCRtpTransceiver.prototype.setDirection){
             /** Direction setting occasionally does not trigger onnegotiationneeded */
-            pc.getTransceivers()[mid].direction = 'sendonly';
-            pc.getTransceivers()[mid].direction = 'inactive';
+            transceiverTarget.direction = 'sendonly';
+            transceiverTarget.direction = 'inactive';
 
-            pc.getTransceivers()[mid].direction = 'recvonly';
-            pc.getSenders()[mid].replaceTrack(null)
+            transceiverTarget.direction = 'recvonly';
+            transceiverTarget.sender.replaceTrack(null)
                 .then(function () {
                     log.info('use replaceTrack to add stream ');
                 })
@@ -393,17 +403,63 @@ PeerConnection.prototype.processRemoveStream = function (stream, pc, type) {
                 })
         }else{
             log.info('use replaceTrack to remove stream.');
-            pc.getTransceivers()[mid].setDirection('recvonly');
+            transceiverTarget.setDirection('recvonly');
         }
     }else {
         /** see bug 137445 for safari 11.0.2 and 11.1.2 * */
-        let browserDetail = This.gsRTC.getBrowserDetail()
-        if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2") && pc.getSenders().length > 0){
-            pc.getSenders()[mid].track.enabled = false;
+        let browserDetail = gsRTC.getBrowserDetail()
+        if(browserDetail.browser === 'safari' && (browserDetail.UIVersion === "11.0.2" || browserDetail.UIVersion === "11.1.2" ) && transceiverTarget){
+            transceiverTarget.sender.track.enabled = false;
         }else if(stream){
             pc.removeStream(stream);
         }
         log.info('use removeStream to remove stream ');
+    }
+}
+
+// 针对stream.inactive 处理（关闭流）
+GsRTC.prototype.oninactiveStopStream = function(stream){
+    if(!stream){
+       log.warn("no stream")
+        return
+    }
+    let This = this
+    if( This.RTCSession.sharingPermission === 1){
+        if( This.RTCSession.isOpenSharingReceiveReply === false){
+            log.info('do not receive reply of shareScreen signaling: user trigger  bar close stream')
+            if( This.RTCSession.isSendCancelRequest === false){
+                log.info('be ready to execute the cancel process ')
+                This.RTCSession.isSendCancelRequest = true
+                This.sendCancel(stream)
+            }else{
+                log.warn('reply cancelRequest')
+                //此场景暂时没有  如果有，则根据前端的传下来的参数关闭流即可
+            }
+        }else{
+            //gsphone 回复了开启演示信令
+            log.info('receive reply of shareScreen signaling: user  trigger  bar close stream')
+            if( This.RTCSession.isSendCancelRequest === false){
+                if( This.RTCSession.openSharing === false){
+                    This.RTCSession.isSendCancelRequest = true
+                    log.warn("be ready to execute the cancel process ")
+                    This.sendCancel(stream)
+                }else{
+                    log.info("user clicks the bottom share bar to stop sharing")
+                    stopScreen()
+                }
+            }else{
+                if(This.RTCSession.openSharing === false){
+                    log.info("reply cancelRequest")
+                    //发送cancel 此场景暂时没有；如果有，则根据前端的传下来的参数关闭流即可
+                }else{
+                    log.info("user clicks the bottom share bar to stop sharing")
+                    stopScreen()
+                }
+            }
+        }
+    }else{
+        log.info("开启演示为: "+This.RTCSession.sharingPermission + " ,user clicks the bottom share bar to stop sharing")
+        stopScreen()
     }
 }
 

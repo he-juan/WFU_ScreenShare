@@ -1,11 +1,11 @@
 
 PeerConnection.prototype.onConnectionStateChange = function(pc){
     log.info('onConnectionStateChange type: ' + pc.type + ', connectionState: ' + pc.connectionState)
-
-    let browserDetails = this.gsRTC.getBrowserDetail()
+    let browserDetails = gsRTC.getBrowserDetail()
     if(pc.connectionState === 'failed' && ((browserDetails.browser === 'chrome' && browserDetails.version >= 76) || (browserDetails.browser === 'opera' &&browserDetails.chromeVersion >= 76))){
         this.iceConnectFailed(pc);
     }
+
 }
 
 PeerConnection.prototype.onIceConnectionStateChange = function(pc){
@@ -65,10 +65,11 @@ PeerConnection.prototype.iceConnectFailed = function(pc){
         if(!pc.isIceFailed){
             pc.isIceFailed = true
         }
-        this.onIceRestartFailed();
+        this.onIceRestartFailed(pc);
     }else {
         log.info('Prepare start do ice restart！')
         pc.isIceFailed = true
+        pc.isLocalSdpPending = true
         this.doOffer(pc)
         pc.iceFailureNum ++
     }
@@ -106,7 +107,7 @@ PeerConnection.prototype.onIceCandidate = function (pc, event) {
 
 PeerConnection.prototype.onIceGatheringCompleted = function () {
     let This = this
-    if(!This.gsRTC.isProcessingInvite){
+    if(!This.isProcessingInvite){
         return
     }
 
@@ -117,14 +118,15 @@ PeerConnection.prototype.onIceGatheringCompleted = function () {
     }
     log.warn("__MyOnIceGatheringCompleted be ready to send INVITE or 200OK");
 
-    This.gsRTC.isProcessingInvite = false
+    This.isProcessingInvite = false
     let sdp = This.decorateLocalSDP()
-    This.gsRTC.saveSDPSessionVersion(sdp)
+    gsRTC.saveSDPSessionVersion(sdp)
     let data = {
-        type: gsRTC.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
+        type: This.isSendReInvite ? gsRTC.SIGNAL_EVENT_TYPE.RE_INVITE : gsRTC.SIGNAL_EVENT_TYPE.INVITE,
         mediaSession: sdp
     }
-    This.gsRTC.sokect.sendMessage(data)
+    gsRTC.sokect.sendMessage(data)
+
 }
 
 

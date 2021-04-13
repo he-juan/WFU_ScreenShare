@@ -73,9 +73,6 @@ GsRTC.prototype.trigger = function(eventName) {
             }
         }
     }
-
-    // After the event monitoring is completed, delete the callback event
-    this.off(eventName)
 }
 
 /**
@@ -286,13 +283,13 @@ GsRTC.prototype.isReplaceTrackSupport = function() {
             result = browserDetails.version >= 59
             break
         case 'safari':
-            result = browserDetails.version >= '12.1.1'
+            result = browserDetails.UIVersion >= '12.1.1'
             break
         default:
             break
     }
 
-    log.info(browserDetails.browser + ' ' + browserDetails.version +' version support replaceTrack : ' + result)
+    log.info(browserDetails.browser + ' ' + browserDetails.UIVersion +' version support replaceTrack : ' + result)
     return result
 }
 
@@ -393,6 +390,7 @@ GsRTC.prototype.getBrowserDetail = function () {
             result.version = extractVersion(navigator.userAgent, /AppleWebKit\/(\d+)\./, 1);
             result.UIVersion = navigator.userAgent.match(/Version\/([\d.]+)/)[1]; //Version/11.0.1
 
+
         } else { // unknown webkit-based browser.
             result.browser = 'Unsupported webkit-based browser ' + 'with GUM support but no WebRTC support.';
             return result;
@@ -402,7 +400,6 @@ GsRTC.prototype.getBrowserDetail = function () {
         result.browser = 'Not a supported browser.';
         return result;
     }
-
     return result;
 }
 
@@ -447,4 +444,30 @@ GsRTC.prototype.getScreenResolution = function() {
     }
     log.info("screen resolution = " + window.screen.height * window.devicePixelRatio + " * " + window.screen.width * window.devicePixelRatio);
     return InitResolution;
+}
+
+GsRTC.prototype.isWFUShareScreenSupport = function() {
+    let browserDetails = this.getBrowserDetail()
+    let result = true
+
+    switch (browserDetails.browser) {
+        case 'chrome':
+            result = browserDetails.version >= 72
+            break
+        case 'opera':
+            result = browserDetails.version >= 60
+            break
+        case 'firefox':
+            result = browserDetails.version >= 60
+            break
+        case 'edge':
+            result = browserDetails.version >= 79
+            break
+        case 'safari':
+            result = browserDetails.UIVersion >= '13.0'
+            break
+        default:
+            break
+    }
+    return result
 }

@@ -13,9 +13,28 @@ log.error = window.debug("GARTC_JSEP:ERROR");
  * @constructor
  */
 let PeerConnection = function (gsRTC) {
-    this.gsRTC = gsRTC
-    this.conf = {}
+    // this.gsRTC = gsRTC
+    // this.conf = {}
     this.peerConnection = null
+    this.isProcessingInvite = false
+
+    this.isSendReInvite = false            // 判断是否为re-invite
+    this.sendCtrlPresentation = false      // 判断是否需要发送ctrlPresentation控制信令
+    this.sharingPermission = 0             // 标记共享命令：1开启 0关闭 (webUI) / 2开启 3关闭(遥控器) / 4请求结束通话 5结束通话
+    this.mLineOrder = []                   // 记录m行的顺序
+    this.initialResolution = null
+
+    this.replyOpenSharingTimerTime = 35                    // 回复开启演示的时间
+    this.openSharingTimeoutstartTime = null                // 开启演示超时
+    this.openSharingTimestamp = null                       // 计算时间戳
+    this.timeBox = null                                    // shareScreenRequest开启共享定时器 或者 发送ctrlPresentation开启定时器(回复webUI请求信令超时)
+    this.openSharing = false                               // 判断是否正在开启演示
+
+    this.isOpenSharingReceiveReply = false                 // 是否回复开启演示信令
+    this.isSendCancelRequest = false                       // 是否发送取消开启演示信令
+    this.reqId = null                                      // 某个动作的reqId
+    this.cancelReqId = null                                // 取消某个动作对应的reqId，如取消开启演示
+    this.cancelReqCmd = null                               // 取消某个动作对应的信令，如ctrlPresentation
 }
 
 /**
@@ -27,7 +46,6 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
     try {
         let This = this
         let type = 'multiStreamPeer'
-
         this.peerConnection = This.createPeerConnection(type, conf)
         let pc = This.peerConnection
 
@@ -41,10 +59,15 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
             log.info('use captureStream to add transceiver ');
             // get two video stream
             let streamArray = This.getCaptureStream(2)
-            for(let i = 0; i<streamArray.length; i++){
-                let stream = streamArray[i]
-                log.info('add stream to peerConnection: ' + stream.id)
-                pc.addStream(stream)
+            if(streamArray && streamArray.length){
+                for(let i = 0; i<streamArray.length; i++){
+                    let stream = streamArray[i]
+                    log.info('add stream to peerConnection: ' + stream.id)
+                    pc.addStream(stream)
+                }
+            }else {
+                log.warn('Browser is not support captureStream!')
+                return
             }
         }
 
@@ -60,14 +83,22 @@ PeerConnection.prototype.createMultiStreamRTCSession = function(conf){
  */
 PeerConnection.prototype.subscribeStreamEvents = function (pc) {
     let This = this
-    if (this.gsRTC.isReplaceTrackSupport()) {
-        pc.ontrack = function (evt) {
+    if (gsRTC.isReplaceTrackSupport()) {
+            pc.ontrack = function (evt) {
             log.info('__on_add_track')
-            if(evt.streams[0]){
-                let type = This.gsRTC.getTypeByMid(evt.transceiver.mid)
-                This.setStream(evt.streams[0], type, false)
+            let stream = evt.streams ? evt.streams[0] : null
+            log.info('__on_add_track: ', stream)
+            if (!stream && evt.track) {
+                log.info('`stream` is undefined on `ontrack` event in WebRTC', evt.track)
+                stream = new MediaStream()
+                stream.addTrack(evt.track)
+            }
 
-                evt.streams[0].onremovetrack = function (evt) {
+            if(stream){
+                let type = gsRTC.getTypeByMid(evt.transceiver.mid)
+                This.setStream(stream, type, false)
+
+                stream.onremovetrack = function (evt) {
                     log.info('__on_remove_track')
                     This.setStream(null, type, false)
                 }
@@ -87,6 +118,8 @@ PeerConnection.prototype.subscribeStreamEvents = function (pc) {
     }
 }
 
+
+
 /**
  * create peerConnection
  * @param type
@@ -97,27 +130,31 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     log.info("Create peerConnection : " + type)
     let This = this
     let pc
-    let config = {iceTransportPolicy: 'all'}
+    let config = {
+        iceTransportPolicy: 'all',
+        bundlePolicy: 'max-compat'
+    }
     let iceservers = conf.iceServer;
-    let RTCpeerConnectionOptional = This.conf.RTCpeerConnectionOptional;
+    let RTCpeerConnectionOptional = gsRTC.conf.RTCpeerConnectionOptional;
     // chrome 72 版本默认unified-plan， 65版本开始unified-plan为实验性质标志，通过sdpSemantics: unified-plan 启用
     if (RTCpeerConnectionOptional === null || RTCpeerConnectionOptional === undefined) {
-        RTCpeerConnectionOptional = { optional: [ { 'pcName': "PC_" + type + "_" + Math.random().toString(36).substr(2) }, { 'googDscp': true }, { 'googIPv6': false } ] };
+        RTCpeerConnectionOptional = { optional: [ { 'pcName': "PC_" + type + "_" + Math.random().toString(36).substr(2) }, { 'googDscp': true }, { 'googIPv6': true } ] };
     }
     else if(RTCpeerConnectionOptional && RTCpeerConnectionOptional.optional && RTCpeerConnectionOptional.optional.length > 0){
-        RTCpeerConnectionOptional.optional.push( { 'pcName': "PC_" + type + "_" + Math.random().toString(36).substr(2) }, { 'googDscp': true }, { 'googIPv6': false });
+        RTCpeerConnectionOptional.optional.push( { 'pcName': "PC_" + type + "_" + Math.random().toString(36).substr(2) }, { 'googDscp': true }, { 'googIPv6': true });
     }
     // config["sdpSemantics"] = "unified-plan";
     if(iceservers === null || iceservers === undefined || iceservers.length === 0){
         log.info('iceServers is null')
     }else {
-        log.info('icesServer ' + This.conf.iceServer)
-        config.iceServers = conf.iceServer;
+        log.info('icesServer ' + gsRTC.conf.iceServer)
+        config.iceServers = gsRTC.conf.iceServer;
     }
-    if(This.gsRTC.getBrowserDetail().browser !== 'firefox'){
+    if(gsRTC.getBrowserDetail().browser !== 'firefox'){
         // firefox not support no need set sdpSemantics config
         config.sdpSemantics = "unified-plan";
     }
+
     log.warn("config: ", config)
     log.warn("RTCpeerConnectionOptional: ", RTCpeerConnectionOptional)
 
@@ -131,27 +168,6 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     pc.isLocalSdpPending = true;
     This.subscribeStreamEvents(pc)
 
-    // 服务器回复的200 ok中，audio默认 sendrecv，不添加流的话会报错："Answer tried to set recv when offer did not set send"
-    if(!This.gsRTC.MEDIA_STREAMS.LOCAL_AUDIO_STREAM){
-        if(This.gsRTC.getBrowserDetail().browser === 'firefox' && This.gsRTC.getBrowserDetail().version > 60){
-            log.warn('firefox get fake stream')
-            function getMediaCallBack(data){
-                if(data.stream){
-                    log.info('get fake stream success')
-                    data.stream.getTracks().forEach(function(track) {
-                        track.enabled = false; //Mute this track, incase the audio send out.
-                    });
-                    This.processAddStream(data.stream , pc, 'audio');
-                }else {
-                    log.info(data)
-                    log.error(data.error)
-                }
-            }
-            let conf = { streamType: 'audio', callback: getMediaCallBack }
-            let constraints =  { audio: true, video: false, fake: true }
-            This.gsRTC.device.getMedia(conf, constraints)
-        }
-    }
 
     pc.onicecandidate = function (event) {
         This.onIceCandidate(pc, event);
@@ -172,7 +188,6 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
     pc.onconnectionstatechange = function (event) {
         This.onConnectionStateChange(pc, event)
     }
-
     return pc
 }
 
@@ -183,7 +198,7 @@ PeerConnection.prototype.createPeerConnection = function (type, conf) {
  */
 PeerConnection.prototype.doOffer = async function (pc) {
     let This = this
-    This.gsRTC.isProcessingInvite = true
+    This.isProcessingInvite = true
     log.info("create sdp( PC: " + pc.type + " )");
     // Added checks to ensure that connection object is defined first
     if (!pc) {
@@ -196,9 +211,9 @@ PeerConnection.prototype.doOffer = async function (pc) {
         log.warn("Dropping of creating of offer as signalingState is not " + pc.signalingState);
         return;
     }
-    log.info('Creating offer');
 
-    pc.offerConstraints = {
+    log.info('Creating offer');
+    var offerConstraints = {
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
     }
@@ -216,7 +231,13 @@ PeerConnection.prototype.doOffer = async function (pc) {
 
     try {
         log.log(pc.type + ' createOffer start');
-        const offer = await pc.createOffer(pc.offerConstraints);
+        let offer
+        if(pc.action === 'iceRestart'){
+            offerConstraints.iceRestart = true
+            offer = await pc.createOffer(offerConstraints);
+        }else{
+            offer = await pc.createOffer(offerConstraints );
+        }
         await onCreateOfferSuccess(offer);
     } catch (error) {
         This.onCreateLocalDescriptionError(error);
@@ -231,7 +252,7 @@ PeerConnection.prototype.doOffer = async function (pc) {
 PeerConnection.prototype.doAnswer = async function (pc) {
     let This = this
     pc.isLocalSdpPending = true
-    this.gsRTC.isProcessingInvite = true
+    This.isProcessingInvite = true
     log.info("prepare do answer")
     // Added checks to ensure that connection object is defined first
     if (!pc) {
@@ -272,8 +293,7 @@ PeerConnection.prototype.doAnswer = async function (pc) {
 PeerConnection.prototype.setLocalDescriptionSuccess = function (pc) {
     log.info('setLocalDescription success ( ' + pc.type + ')')
     // If you don't recollect the dates, you need to judge here whether you can send invite or 200 ok
-    if (pc.iceGatheringState === 'complete') {
-        pc.isLocalSdpPending = false
+    if (pc.iceGatheringState === 'complete' && !pc.isLocalSdpPending) {
         log.info("onSetLocalDescriptionSuccess send invite( PC: " + pc.type + " )");
         this.onIceGatheringCompleted();
     }
@@ -322,14 +342,14 @@ PeerConnection.prototype.setRemoteDescriptionSuccess = function () {
     let This = this
     log.info('setRemoteDescription success ')
 
-    if(This.gsRTC.sendCtrlPresentation){
-        if(gsRTC.sharingPermission > 3){
-            This.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet: gsRTC.CODE_TYPE.SUCCESS })
-        }else {
-            This.gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT, ctrlPresentation: { value: gsRTC.sharingPermission }})
+    if(This.peerConnection.action === 'iceRestart'){
+        gsRTC.trigger('onIceReconnect', {codeType: gsRTC.CODE_TYPE.SUCCESS.codeType})
+        This.peerConnection.action = null
+    }else{
+        if(This.sharingPermission === 1 || This.sharingPermission === 3){
+            This.openSharing = true
         }
-    }else {
-        This.gsRTC.trigger(This.gsRTC.action, This.gsRTC.CODE_TYPE.SUCCESS);
+        gsRTC.trigger(gsRTC.action, {codeType: gsRTC.CODE_TYPE.SUCCESS.codeType})
     }
 }
 
@@ -340,4 +360,47 @@ PeerConnection.prototype.setRemoteDescriptionSuccess = function () {
 PeerConnection.prototype.onSetRemoteDescriptionError = function (error) {
     log.error(`Failed to set remote description: ${error}`);
     console.error(error)
+}
+
+/**
+ * close  stream
+ *@param stream
+ *  **/
+
+PeerConnection.prototype.stopTrack = function (stream){
+    log.info("stop stream and stop track")
+    let tracks = stream.getTracks();
+    for (let track in tracks) {
+        tracks[track].onended = null;
+        tracks[track].stop();
+    }
+}
+
+/**
+ * get codec to enable ExternalEncoder
+ * @param media
+ * @returns {*}
+ */
+PeerConnection.prototype.getExternalEncoder = function(media){
+    let codec
+    if(media && media.fmtp && media.fmtp.length){
+        for(let i = 0; i< media.fmtp.length; i++){
+            let config = media.fmtp[i].config
+            if(config.indexOf('packetization-mode=1') >= 0 && config.indexOf('profile-level-id=42e0') >= 0) {
+                codec = media.fmtp[i].payload
+                break;
+            }
+        }
+        if(!codec){
+            for(let i = 0; i<media.fmtp.length; i++){
+                let config = media.fmtp[i].config
+                if(config.indexOf('packetization-mode=1') >= 0 && config.indexOf('profile-level-id=4200') >= 0) {
+                    codec = media.fmtp[i].payload
+                    break;
+                }
+            }
+        }
+        log.info('get priority H264 PT ' + codec)
+    }
+    return codec
 }

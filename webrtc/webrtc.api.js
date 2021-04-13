@@ -5,40 +5,80 @@ log.info = window.debug("WEBRTC_API:INFO");
 log.warn = window.debug("WEBRTC_API:WARN");
 log.error = window.debug("WEBRTC_API:ERROR");
 /*Log Debug End*/
-
-/**
- * Open to upper-level event registration interface
- * eventType：Event type
- * handerFun：User-defined processing functions
- */
-function addEventHandler(eventType,handlerFun){
-    if (window.gsRTC){
-        window.gsRTC.on(eventType,handlerFun);
-        window.gsRTC.handlerFuns[eventType] = handlerFun;
-    }else {
-        log.error("ERR_NOT_INITIALIZED: Engine not initialized yet. Please create gsRTC first");
-    }
-}
-
 /**
  * 呼叫
  * @param wsAddr websocket地址
  * @param callback 回调
  */
 function call(wsAddr, callback) {
-    let protocols = 'gs-webrtc-json';
+    let protocol = 'gs-webrtc-json';
     if(!wsAddr){
         log.error('INVALID WEBSOCKET ADDRESS：' + wsAddr)
-        callback(gsRTC.CODE_TYPE.INVALID_WEBSOCKET_ADDRESS)
+        gsRTC.trigger("error",{codeType:gsRTC.CODE_TYPE.INVALID_WEBSOCKET_ADDRESS.codeType,message:gsRTC.CODE_TYPE.INVALID_WEBSOCKET_ADDRESS.message})
         return
     }
 
     let sipRegisterInfo = {
-        protocol: protocols,
-        websocketUrl: wsAddr,
+        protocol: protocol,
+        url: wsAddr,
+        callback: callback
     }
-    gsRTC.sokect = new WebSocketInstance(sipRegisterInfo.websocketUrl, sipRegisterInfo.protocol)
-    gsRTC.inviteCall({callback: callback});
+
+    if( !gsRTC.isWFUShareScreenSupport()) {
+        log.warn("当前浏览器版本不支持屏幕共享")
+        log.warn("支持屏幕共享的浏览器版本分别是：Chrome是72版本以上、opera是60版本以上、firefox是60版本以上、edge是79版本以上、Safari是13.1.1版本以上")
+        gsRTC.trigger("error",{codeType:gsRTC.CODE_TYPE.NOT_SUPPORT_SCREEN_SHARE.codeType,message:gsRTC.CODE_TYPE.NOT_SUPPORT_SCREEN_SHARE.message})
+    }else {
+        function successCallBack() {
+            log.info("determine whether to create a new webSocket")
+            if(!gsRTC.sokect || !gsRTC.sokect.ws || (gsRTC.sokect && gsRTC.sokect.ws && gsRTC.sokect.ws.readyState !== 1)){
+                gsRTC.sokect = new WebSocketInstance(sipRegisterInfo)
+            } else {
+                gsRTC.inviteCall({callback:sipRegisterInfo.callback});
+            }
+        }
+
+        if(gsRTC.getBrowserDetail().browser === 'safari'){
+            function safariGetMediaCallBack(event){
+                if(event.stream){
+                    log.info('get stream success '+ event.stream.id)
+                    gsRTC.shareScreenStream = event.stream
+                    successCallBack()
+                }else{
+                    gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.isCallSuccess = 'false'
+                    gsRTC.trigger("error",{codeType:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.codeType,message:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.message,isCallSuccess:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.isCallSuccess})
+                }
+            }
+
+            let data = {streamType: 'screenShare', callback: safariGetMediaCallBack}
+
+            gsRTC.getPreImgSize(function(resolution,bitrate,frame) {
+                let getWebUIResolution = gsRTC.getResolutionFromWebUI(resolution)
+                let newFrame = parseInt(frame)
+                let constraints = {
+                    audio: false,
+                    video: {
+                        width: {
+                            ideal: getWebUIResolution.width ||1920,
+                            max:  getWebUIResolution.width || 1920,
+                        },
+                        height: {
+                            ideal:getWebUIResolution.height || 1080,
+                            max: getWebUIResolution.height  || 1080,
+                        },
+                        frameRate: {
+                            ideal:  newFrame || 15,
+                            max:  newFrame || 15
+                        }
+                    }
+
+                };
+                gsRTC.device.getMedia(data, constraints)
+            })
+        }else{
+            successCallBack()
+        }
+    }
 }
 
 /**
@@ -55,14 +95,106 @@ function beginScreen(callback){
         log.warn("please call first")
         return
     }
-
     let data = {
         type: 'slides',
         callback: callback
     }
+    let session = gsRTC.RTCSession
 
-    gsRTC.sharingPermission = 1
-    gsRTC.shareScreen(data)
+
+    function getMediaCallBack(event){
+        if(event.stream){
+            if(session.openSharingTimestamp <= 30 ){
+                try {
+                    log.info('get stream success, ' + event.stream.id)
+                    let stream = event.stream
+                    let type = 'slides'
+
+                    if (gsRTC.getBrowserDetail().browser === 'firefox') {
+                        let tracks = stream.getVideoTracks();
+                        tracks[0].onended = function () {
+                            gsRTC.oninactiveStopStream(stream)
+                        }
+                    }else{
+                        stream.oninactive= function () {
+                            gsRTC.oninactiveStopStream(stream)
+                        }
+                    }
+                    session.setStream(stream, type, true)
+                    data.stream = stream
+                    if(session.sharingPermission !== 3){
+                        session.sharingPermission = 1
+                    }
+                    gsRTC.shareScreen(data)
+                }catch (e) {
+                    console.error(e)
+                }
+            }else{
+                session.openSharingTimestamp = null
+                session.stopTrack(event.stream)
+                session.sharingPermission = 1
+            }
+        }else {
+            log.error('Get present stream failed: ' + event.error)
+            if(gsRTC.getBrowserDetail().browser === 'firefox'){
+                gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.rejectAuthorizationTip  = 'true'
+            }
+
+            if(session.sharingPermission === 3){
+                session.openSharingTimeoutstartTime = null
+                session.openSharingTimestamp = null
+                session.sendCtrlPresentation = false
+                if(session.timeBox){
+                    clearInterval(session.timeBox)
+                    session.timeBox = null
+                }
+                gsRTC.action = 'shareScreenRequest'
+                gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON, reqId: session.reqId})
+                gsRTC.trigger('error',{codeType:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.codeType,message:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.message,
+                    rejectAuthorizationTip: gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.rejectAuthorizationTip})
+                session.sharingPermission = 0
+
+            }else{
+                session.sharingPermission = 0
+                gsRTC.action = 'shareScreen'
+                gsRTC.trigger('error',{codeType:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.codeType,message:gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.message,
+                    rejectAuthorizationTip: gsRTC.CODE_TYPE.CANCEL_PRESENT_ON.rejectAuthorizationTip})
+            }
+        }
+    }
+
+    let gumData = {streamType: 'screenShare', callback: getMediaCallBack}
+    let constraints = {
+        audio: false,
+        video: {
+            width: {
+                ideal: session.initialResolution && session.initialResolution.width || 1920,
+                max:  session.initialResolution && gsRTC.RTCSession.initialResolution.width || 1920
+            },
+            height: {
+                ideal: session.initialResolution && session.initialResolution.height ||1080,
+                max: session.initialResolution && session.initialResolution.height || 1080
+            },
+            frameRate: {
+                ideal: session.initialResolution && session.initialResolution.framerate || 15,
+                max: session.initialResolution && session.initialResolution.framerate || 15
+            }
+        }
+    };
+    log.info(JSON.stringify(constraints, null, ' '))
+
+    if(gsRTC.shareScreenStream){
+        getMediaCallBack({stream: gsRTC.shareScreenStream})
+        gsRTC.shareScreenStream = null
+    }else{
+        if(session.sharingPermission == 3){
+            if(session.openSharingTimestamp <= 30){
+                gsRTC.device.getMedia(gumData, constraints)
+            }
+        }else{
+            gsRTC.device.getMedia(gumData, constraints)
+        }
+    }
 }
 
 /**
@@ -104,8 +236,18 @@ function stopScreen(callback){
         return
     }
 
-    gsRTC.sharingPermission = 0
-    gsRTC.stopShareScreen({callback: callback})
+    if(gsRTC.RTCSession.sharingPermission !==  2){
+        gsRTC.RTCSession.sharingPermission = 0
+    }
+    if(gsRTC.RTCSession.openSharing === false){
+        log.info("No stream or Reject shareScreen or stopShareScreen request again after replying to the signaling")
+        if(gsRTC.RTCSession.sharingPermission === 2) {
+            gsRTC.RTCSession.sendCtrlPresentation = false
+            gsRTC.sokect.sendMessage({type: gsRTC.SIGNAL_EVENT_TYPE.PRESENT_RET, ctrlPresentationRet:gsRTC.CODE_TYPE.REJECT_MULTIPLE_REQUESTS, reqId: gsRTC.RTCSession.reqId})
+        }
+    }else{
+        gsRTC.stopShareScreen({callback: callback})
+    }
 }
 
 /**
@@ -144,7 +286,7 @@ function stopVideo(callback){
 /**
  * 挂断
  */
-function hangup(callback) {
+function hangUP(callback) {
     if (!gsRTC) {
         log.warn('gsRTC is not initialized')
         return
@@ -158,54 +300,8 @@ function hangup(callback) {
         log.warn("socket is not exist")
         return
     }
-
+    if(gsRTC.RTCSession.sharingPermission !==  4){
+        gsRTC.RTCSession.sharingPermission = 5
+    }
     gsRTC.endCall({callback: callback})
 }
-
-/**
- * 页面加载后自动扫描可用设备
- */
-(function () {
-    if (window.MediaDevice) {
-        let mediaDevice = new MediaDevice
-        let videoInputList = []
-        let audioOutputList = []
-        mediaDevice.enumDevices(deviceInfo => {
-            log.warn("deviceInfo.cameras: ", deviceInfo.cameras)
-            if (deviceInfo.cameras) {
-                for (let i = 0; i < deviceInfo.cameras.length; i++) {
-                    if (!deviceInfo.cameras[i].label) {
-                        deviceInfo.cameras[i].label = 'camera' + i
-                    }
-                    videoInputList.push('<option class="cameraOption" value="' + deviceInfo.cameras[i].deviceId + '">' + deviceInfo.cameras[i].label + '</option>')
-                    log.log('camera: ' + deviceInfo.cameras[i].label)
-                }
-                let videoList = document.getElementById('videoList')
-                if(videoList){
-                    videoList.innerHTML = videoInputList.join('')
-                }
-            }
-
-            let audioOutput = deviceInfo.speakers.length > 0 ? deviceInfo.speakers : deviceInfo.microphones
-            log.warn("get audioOutput: ", audioOutput)
-            if (audioOutput) {
-                for (let j = 0; j < audioOutput.length; j++) {
-                    if (!audioOutput[j].label) {
-                        audioOutput[j].label = 'speakers' + j
-                    }
-                    // 过滤default 和 communications 类型
-                    if (audioOutput[j].deviceId !== 'default' && audioOutput[j].deviceId !== 'communications') {
-                        audioOutputList.push('<option class="cameraOption" value="' + audioOutput[j].deviceId + '">' + audioOutput[j].label + '</option>')
-                        log.log('speakers: ' + audioOutput[j].label)
-                    }
-                }
-                let audioList = document.getElementById('audioList')
-                if(audioList){
-                    audioList.innerHTML = audioOutputList.join('')
-                }
-            }
-        }, function (error) {
-            log.error('enum device error: ' + error)
-        })
-    }
-})()

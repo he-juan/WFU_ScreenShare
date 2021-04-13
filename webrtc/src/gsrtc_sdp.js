@@ -660,9 +660,10 @@ GsRTC.prototype.adjustOrderOfMLines = function (sdp) {
         }
         parseSDP.msidSemantics.push( {semantic: "", token: "WMS"})
         This.saveMid(type, originalMid)
-        This.mLineOrder.push(type)
+        This.RTCSession.mLineOrder.push(type)
     }
-    This.mLineOrder = [...new Set(This.mLineOrder)];
+    This.RTCSession.mLineOrder = [...new Set(This.RTCSession.mLineOrder)];
+
     parseSDP.media = [audioArray]
     parseSDP.media = parseSDP.media.concat(videoArray)
     sdp = SDPTools.writeSDP(parseSDP)
@@ -703,7 +704,7 @@ GsRTC.prototype.removeSSRC = function (sdp) {
 GsRTC.prototype.removeCodeByName = function (sdp) {
     log.info('remove ssrc')
     let lines = sdp.split('\n')
-    let removePayloads = [106, 105, 13, 110, 112, 113, 98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116]
+    let removePayloads = [97,106, 105, 13, 110, 112, 113, 98, 99, 127, 121, 125, 107, 108, 109, 124, 120, 123 ,119, 114, 115 ,116]
 
     function getMLinePosition(lines){
         // 获取所有m行的位置
@@ -771,4 +772,61 @@ GsRTC.prototype.removeCodeByName = function (sdp) {
         result = result + item
     }
     return result
+}
+
+
+GsRTC.prototype.deleteCodeByName = function(sdp){
+    log.info("delete codec")
+    let parseSDP = SDPTools.parseSDP(sdp)
+    if(parseSDP.media && parseSDP.media.length){
+        for(let i = 0;i < parseSDP.media.length;i++){
+            let media = parseSDP.media[i]
+            let codec = ['vp8','vp9']
+            if(media.type === "audio"){
+                codec = ['G722', 'opus', 'PCMU', 'PCMA']     // only keep ['G722', 'opus', 'PCMU', 'PCMA']
+                SDPTools.removeCodecByName(parseSDP, i, codec, true)
+            }else{
+                // move red_ulpfec
+                if(localStorage.getItem("test_red_ulpfec_enabled") !== 'true'){
+                    codec.push('red', 'ulpfec')
+                }
+                // handle H264 codec
+                parseSDP = gsRTC.trimCodec(parseSDP, i)
+                SDPTools.removeCodecByName(parseSDP, i, codec)
+            }
+        }
+    }
+    sdp = SDPTools.writeSDP(parseSDP)
+    return sdp
+}
+
+GsRTC.prototype.trimCodec = function (parseSDP, index){
+    let media = parseSDP.media[index]
+    let priorityCodec = gsRTC.RTCSession.getExternalEncoder(media)
+    let h264Codec = SDPTools.getCodecByName(parseSDP, index,['H264','VP8','VP9'])
+    if(h264Codec && h264Codec.length){
+        let removeList = []
+        if(!priorityCodec){
+            let topPriorityCodec = h264Codec.splice(1, h264Codec.length)
+            removeList.push(topPriorityCodec)
+            // If profile-level-id does not exist, set to 42e028
+            for(let i = 0; i<media.fmtp.length; i++){
+                if( media.fmtp[i].payload === topPriorityCodec){
+                    let config = media.fmtp[i].config
+                    if(config.indexOf('profile-level-id') < 0){
+                        config = config + ';profile-level-id=42e028';
+                    }
+                }
+            }
+        }else {
+            h264Codec.forEach(function (pt) {
+                if(pt !== priorityCodec){
+                    removeList.push(pt)
+                }
+            })
+        }
+        SDPTools.removeCodecByPayload(parseSDP, index, removeList)
+    }
+
+    return parseSDP
 }
