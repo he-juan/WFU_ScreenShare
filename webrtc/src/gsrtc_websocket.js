@@ -69,7 +69,7 @@ WebSocketInstance.prototype.createWebSocket = function(data){
     ws.onclose = function (event) {
         log.info('websocket onclose')
         This.isChannelOpen = false
-        if(gsRTC.RTCSession.sharingPermission !== 4  && gsRTC.RTCSession.sharingPermission !== 5){
+        if(gsRTC && gsRTC.RTCSession && (gsRTC.RTCSession.sharingPermission !== 4  && gsRTC.RTCSession.sharingPermission !== 5)){
             log.warn("同步按钮状态")
             gsRTC.trigger("error", {
                 codeType: gsRTC.CODE_TYPE.WEBSOCKET_CLOSE.codeType,
