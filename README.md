@@ -130,7 +130,7 @@ window.gsRTC.on('hangupRequest', (res) => {
         |                    |  405      |  the call in Hold status  (refuse to shareScreen)                                                 |
         |                    |  488      |  Media information ERROR                                                                          |
         |                    |  466      |  Websocket automatically disconnected                                                             |
-        |  底层错误码         |           |                                                                                                   |
+        |  底层错误码        |           |                                                                                                   |
         |                    |  104      |  Share screen is being turned on                                                                  |
         |                    |  105      |  Stop Share Screen is being turned on                                                             |
         |                    |  106      |  Reject shareScreen or stopShareScreen request again after replying to the signaling              |
@@ -151,7 +151,7 @@ window.gsRTC.on('hangupRequest', (res) => {
 
            |Code   | Description   |
            |:------|:--------------|
-           |200    | 请求执行成功    |
+           |200    | 请求执行成功  |
 
      - (2) 3XX 错误码
             > 3XX错误码是webRTC的JS层内部的错误码，该错误码的产生和GVC无关，由webRTC的JS层内部自定义。
