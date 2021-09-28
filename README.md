@@ -198,8 +198,9 @@ window.gsRTC.on('hangupRequest', (res) => {
           |  106      |   No stream or Reject shareScreen or stopShareScreen request again after replying to the signaling      |
 
 
+
      - 错误说明：
-           - 底层错误码情况：
-               - 若错误码为2XX,表示此信令为正常处理；
-               - 若错误码为4XX,表示此信令为异常处理；
-               - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
+        - 底层错误码情况：
+           - 若错误码为2XX,表示此信令为正常处理；
+           - 若错误码为4XX,表示此信令为异常处理；
+           - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
