@@ -1,6 +1,6 @@
 ## Browser compatibility
 
-| Browser |  Edge | Chrome | Opera |  Firefox  |  Safari   |
+| Browser |  Edge | Chrome | Opera |  Firefox  |  Safari   | 
 |:-------:|:-----:|:------:|:-----:|:---------:|:---------:|
 | Version |  79+  |  72+   | 60+   |  60+      | 13.0+     |
 
@@ -21,7 +21,7 @@
 - call(wsAddr, callback)
 - 和gs_phone 建立呼叫
 - 参数
-    + wsAddr： ws连接地址，例：ws://192.168.131.172:10200
+    + wsAddr： ws连接地址，例：ws://192.168.131.172:10200   
     + callback(codeType)： 回调函数。codeType=200时表示成功，其他表示失败
 
 ---
@@ -117,7 +117,6 @@ window.gsRTC.on('hangupRequest', (res) => {
 ## 错误码说明
 
   - 1.错误码说明(GVC3220_Beta)
-      - 如下所示：
 
         |   classification   | Code      | Description                                                                                       |
         |:-------------------|:----------|:--------------------------------------------------------------------------------------------------|
@@ -131,7 +130,7 @@ window.gsRTC.on('hangupRequest', (res) => {
         |                    |  405      |  the call in Hold status  (refuse to shareScreen)                                                 |
         |                    |  488      |  Media information ERROR                                                                          |
         |                    |  466      |  Websocket automatically disconnected                                                             |
-        |  底层错误码        |           |                                                                                                   |
+        |  底层错误码         |           |                                                                                                   |
         |                    |  104      |  Share screen is being turned on                                                                  |
         |                    |  105      |  Stop Share Screen is being turned on                                                             |
         |                    |  106      |  Reject shareScreen or stopShareScreen request again after replying to the signaling              |
@@ -148,16 +147,14 @@ window.gsRTC.on('hangupRequest', (res) => {
 
   - 2.修改后错误码说明（GVC3220）
      - (1) 2XX 错误码
-     
-        - 2XX错误码均代表请求执行成功，仅在响应中携带。
+          > 2XX错误码均代表请求执行成功，仅在响应中携带。
 
            |Code   | Description   |
            |:------|:--------------|
-           |200    | 请求执行成功  |
+           |200    | 请求执行成功    |
 
      - (2) 3XX 错误码
-    
-        - 3XX错误码是webRTC的JS层内部的错误码，该错误码的产生和GVC无关，由webRTC的JS层内部自定义。
+            > 3XX错误码是webRTC的JS层内部的错误码，该错误码的产生和GVC无关，由webRTC的JS层内部自定义。
 
            |  Code     |   Description                                                                       |
            |:----------|:------------------------------------------------------------------------------------|
@@ -201,9 +198,8 @@ window.gsRTC.on('hangupRequest', (res) => {
           |  106      |   No stream or Reject shareScreen or stopShareScreen request again after replying to the signaling      |
 
 
-
      - 错误说明：
-        - 底层错误码情况：
-           - 若错误码为2XX,表示此信令为正常处理；
-           - 若错误码为4XX,表示此信令为异常处理；
-           - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
+           - 底层错误码情况：
+               - 若错误码为2XX,表示此信令为正常处理；
+               - 若错误码为4XX,表示此信令为异常处理；
+               - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
