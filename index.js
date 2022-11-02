@@ -127,3 +127,15 @@ function presentPauseOperation(){
     }
 }
 
+function openRemoteScreenShare(){
+    openRemoteControl(function(data){
+        console.warn("openRemoteScreen callback:",data)
+    })
+}
+
+function stopRemoteScreenShare(){
+    stopRemoteControl(function(data){
+        console.warn("stopRemoteScreen callback:",data)
+    })
+}
+
