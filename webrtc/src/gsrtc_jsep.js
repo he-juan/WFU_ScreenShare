@@ -35,6 +35,7 @@ let PeerConnection = function (gsRTC) {
     this.reqId = null                                      // 某个动作的reqId
     this.cancelReqId = null                                // 取消某个动作对应的reqId，如取消开启演示
     this.cancelReqCmd = null                               // 取消某个动作对应的信令，如ctrlPresentation
+    this.isRequestOpenRemoteVideo = false
 }
 
 /**

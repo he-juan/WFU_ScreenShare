@@ -24,7 +24,6 @@ var GsRTC = function (options) {
     this.serverAction = null
     this.shareScreenStream = null                          // 共享桌面流
 
-
     this.device = new MediaDevice()
     this.eventBindings()
     this.trigger()
@@ -624,4 +623,62 @@ GsRTC.prototype.cleanGsRTC = function(){
     This.RTCSession.cancelReqId = null
     This.RTCSession.sharingPermission = null
     This.closePeerConn()
+}
+
+/**
+ * 告知gsPhone开启演示流，web端接受演示流
+ * @param data
+ * data.stream: 要共享的视频流
+ * data.callback
+ */
+GsRTC.prototype.openRemoteVideo = function(data){
+    let This = this
+    if(!This.RTCSession){
+        log.error('openRemoteScreen: invalid RTCSession parameters! ')
+        return
+    }
+
+    let pc = This.RTCSession.peerConnection
+
+    This.action = 'openRemoteControl'
+    log.info("open remote screen")
+    if(data && data.callback && !This.EVENTS[This.action]){
+        This.on(This.action, data.callback)
+    }
+
+    This.RTCSession.isRequestOpenRemoteVideo = true
+    This.RTCSession.doOffer(pc)
+}
+
+/**
+ * 告知gsPhone关闭演示流，web端关闭演示流
+ * @param data
+ * data.stream: 要共享的视频流
+ * data.callback
+ */
+GsRTC.prototype.stopRemoteVideo = function(data){
+    let This = this
+    if(!This.RTCSession){
+        log.error('stopRemoteScreen: invalid RTCSession parameters! ')
+        return
+    }
+
+    let type = 'slides'
+    let stream = This.RTCSession.getStream(type, false)
+    let pc = This.RTCSession.peerConnection
+
+    This.action = 'stopRemoteControl'
+    log.info("stop remote screen")
+    if(data && data.callback && !This.EVENTS[This.action]){
+        This.on(This.action, data.callback)
+    }
+
+    log.info('clear remote stream')
+    This.RTCSession.processRemoveStream(stream, pc, type)
+    This.RTCSession.closeStream(stream)
+    This.RTCSession.setStream(null, type, false)
+
+
+    This.RTCSession.isRequestOpenRemoteVideo = false
+    This.RTCSession.doOffer(pc)
 }

@@ -305,3 +305,49 @@ function hangUP(callback) {
     }
     gsRTC.endCall({callback: callback})
 }
+
+/**
+ * 请求远端开启共享
+ */
+function openRemoteControl(callback) {
+    log.info("Start request open remoteVideo")
+    if (!gsRTC) {
+        log.warn('gsRTC is not initialized')
+        return
+    }
+    if (!gsRTC.RTCSession) {
+        log.warn("please call first")
+        return
+    }
+
+    if(!gsRTC.sokect){
+        log.warn("socket is not exist")
+        return
+    }
+
+    gsRTC.openRemoteVideo({callback: callback})
+}
+
+
+/**
+ * 请求远端关闭共享
+ */
+function stopRemoteControl(callback){
+    log.info("Stop request stop remoteVideo")
+    if (!gsRTC) {
+        log.warn('gsRTC is not initialized')
+        return
+    }
+    if (!gsRTC.RTCSession) {
+        log.warn("please call first")
+        return
+    }
+
+    if(!gsRTC.sokect){
+        log.warn("socket is not exist")
+        return
+    }
+
+    gsRTC.stopRemoteVideo({callback: callback})
+}
+

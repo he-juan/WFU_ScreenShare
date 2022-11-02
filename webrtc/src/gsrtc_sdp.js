@@ -696,6 +696,35 @@ GsRTC.prototype.removeSSRC = function (sdp) {
     return sdp
 }
 
+GsRTC.prototype.modifyMidDirection = function(sdp){
+    log.info("modify mid direction")
+    let This = this
+    let parseSDP = SDPTools.parseSDP(sdp)
+    for(let i =0; i < parseSDP.media.length; i++){
+        let media = parseSDP.media[i]
+        if(media.type === 'audio'){
+            media.direction = "inactive"
+        }else if(media.content === 'main'){
+            if(This.RTCSession.isRequestOpenRemoteVideo){
+                media.direction = 'recvonly'
+            }
+            if(This.action === 'stopRemoteControl'){
+                media.direction = 'inactive'
+            }
+        } else if(media.content === 'slides'){
+
+            if(This.RTCSession.sharingPermission === 1 || This.RTCSession.sharingPermission === 3){
+                media.direction = 'sendonly'
+            }else if(This.RTCSession.sharingPermission === 0 || This.RTCSession.sharingPermission === 2){
+                media.direction = 'inactive'
+            }
+        }
+    }
+
+    sdp = SDPTools.writeSDP(parseSDP)
+    return sdp
+}
+
 /**
  * 根据编解码名称删除编解码
  * @param sdp

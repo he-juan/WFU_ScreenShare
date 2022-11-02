@@ -11,6 +11,7 @@ PeerConnection.prototype.decorateLocalSDP = function () {
     let sdp = This.peerConnection.localDescription.sdp
     sdp = gsRTC.adjustOrderOfMLines(sdp)
     sdp = gsRTC.removeSSRC(sdp)
+    sdp = gsRTC.modifyMidDirection(sdp)
     sdp = gsRTC.deleteCodeByName(sdp)
 
 
