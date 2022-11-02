@@ -62,6 +62,20 @@
     + callback：回调函数
 
 
+7、开启远程会控
+- openRemoteControl(callback)
+- 开启远程会控
+- 参数
+   + callback： 回调函数，参数为codeType=200时表示成功，其他表示失败。
+   
+8、关闭远程会控
+
+- stopRemoteControl(callback)
+- 关闭远程会控
+- 参数
+     + callback： 回调函数，参数为codeType=200时表示成功，其他表示失败。   
+   
+
 ## 注册事件说明
 
 1、web开演示的回调
@@ -113,6 +127,21 @@ window.gsRTC.on('hangupRequest', (res) => {
 })
 ```
 
+8、web开启远程会控
+
+```
+window.gsRTC.on('openRemoteControl', (res) => {
+  console.log('hangupRequest ************************')
+})
+```
+
+9、web关闭远程会控
+
+```
+window.gsRTC.on('stopRemoteControl', (res) => {
+  console.log('hangupRequest ************************')
+})
+```
 
 ## 错误码说明
 
@@ -197,9 +226,30 @@ window.gsRTC.on('hangupRequest', (res) => {
           |  105      |   Share Screen is being turned off                                                                      |
           |  106      |   No stream or Reject shareScreen or stopShareScreen request again after replying to the signaling      |
 
-
      - 错误说明：
-           - 底层错误码情况：
-               - 若错误码为2XX,表示此信令为正常处理；
-               - 若错误码为4XX,表示此信令为异常处理；
-               - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
+         - 底层错误码情况：
+            - 若错误码为2XX,表示此信令为正常处理；
+            - 若错误码为4XX,表示此信令为异常处理；
+            - 若错误码为1xx,表示此信令无效，不采取任何动作（表示此信令是重复操作）
+               
+               
+ -----------
+ 
+ **前端调用底层接口逻辑**     
+ 
+  1. 创建通话：
+  
+     - 首先`创建通话,调用接口call()`
+     
+  2.  开启共享 或者 关闭共享：
+      - 调用接口`beginScreen()`  或者 `stopScreen()`
+  
+  3. 开启会控 或者 关闭会控：
+      - 调用接口`openRemoteControl()`  或者 `stopRemoteControl()`  
+      
+  4. 关闭通话：  
+  
+     - 调用接口`hangUP()`
+      
+      
+            
