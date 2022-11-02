@@ -78,13 +78,17 @@
 <!--操作区-->
 <div>
     <!--本地服务器-->
-    <input type="text" value="ws://192.168.131.123:10200" class="form-control" id="wsAddr" >
+    input type="text" value="ws://192.168.131.16:10200" class="form-control" id="wsAddr" >
     <button type="button" class="btn btn-default" onclick="multiStreamCall();">multiStreamCall</button>
+    <br/>
     <button type="button" class="btn btn-default" id="startVideoShare" onclick="videoOperation(1)">开摄像头</button>
     <button type="button" class="btn btn-default" id="stopVideoShare" onclick="videoOperation(0)">关摄像头</button>
     <button type="button" class="btn btn-default" id="startPresent" onclick="startPresent(1)">开演示</button>
     <button type="button" class="btn btn-default" id="pausePresent" hidden onclick="presentPauseOperation()">暂停演示</button>
     <button type="button" class="btn btn-default" id="stopPresent" onclick="startPresent(0)">关闭演示</button>
+    <hr/>
+    <button type="button" class="btn btn-default" id="openRemotePresent" onclick="openRemoteScreenShare()">请求远端开启演示</button>
+    <button type="button" class="btn btn-default" id="startRemotePresent" onclick="stopRemoteScreenShare()">请求远端关闭演示</button>
     <button type="button" class="btn btn-default" onclick="hangup()">挂断</button>
     <hr>
 </div>
