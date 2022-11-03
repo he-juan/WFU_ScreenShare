@@ -84,6 +84,7 @@ PeerConnection.prototype.setMediaElementStream = function (stream, type, isLocal
     }
 
     let target = gsRTC.HTML_MEDIA_ELEMENT[identify]
+    log.info("target:",target)
     if (target) {
         target.srcObject = stream;
         log.info('Get ' + identify +' stream');
@@ -203,6 +204,7 @@ PeerConnection.prototype.getStreamType = function(type, isLocal){
  * @param isLocal :true for the local stream and false for the accepted remote stream
  */
 PeerConnection.prototype.setStream = function(stream, type, isLocal){
+    log.info('isLocal is ' +  isLocal  + ',  get ' + type +  ' stream ')
     if (!type){
         log.warn("setStream: Invalid parameter!");
         return
@@ -236,8 +238,15 @@ PeerConnection.prototype.setStream = function(stream, type, isLocal){
     }
 
     log.info('set ' + streamType + ' stream id: ' + streamId)
-    gsRTC.MEDIA_STREAMS[streamType] = stream
 
+    gsRTC.trigger('onStreamChange', {
+        stream: stream,
+        type: type,
+        isLocal: isLocal,
+        streamType: streamType
+    })
+
+    gsRTC.MEDIA_STREAMS[streamType] = stream
     if(stream){
         this.setMediaElementStream(stream, type, isLocal)
     }

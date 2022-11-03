@@ -663,7 +663,7 @@ GsRTC.prototype.stopRemoteVideo = function(data){
         return
     }
 
-    let type = 'slides'
+    let type = 'main'
     let stream = This.RTCSession.getStream(type, false)
     let pc = This.RTCSession.peerConnection
 
