@@ -131,7 +131,7 @@ window.gsRTC.on('hangupRequest', (res) => {
 
 ```
 window.gsRTC.on('openRemoteControl', (res) => {
-  console.log('hangupRequest ************************')
+  console.log('openRemoteControl ************************')
 })
 ```
 
@@ -139,9 +139,17 @@ window.gsRTC.on('openRemoteControl', (res) => {
 
 ```
 window.gsRTC.on('stopRemoteControl', (res) => {
-  console.log('hangupRequest ************************')
+  console.log('stopRemoteControl ************************')
 })
 ```
+
+10、监听远端流：
+   
+ ```
+ window.gsRTC.on('onStreamChange', (data) => {
+   console.log('获取流 ************************')
+ })
+ ```  
 
 ## 错误码说明
 
@@ -248,8 +256,17 @@ window.gsRTC.on('stopRemoteControl', (res) => {
       - 调用接口`openRemoteControl()`  或者 `stopRemoteControl()`  
       
   4. 关闭通话：  
-  
      - 调用接口`hangUP()`
-      
+     
+  -------------------------------------------
+     
+  - P21V4 与GVC3220 在sdp 的区别：
+       - GVC3220:(共享功能)
+         - createMediaSession时 默认方向都是recvonly; updateMediaSession时修改演示流方向为sendrecv，对端回复的是recvonly。
+       - P21V4:（共享功能和会控功能）
+         - createMediaSession时 默认方向都是inactive; 更新sdp（reinvite）时根据对应的功能修改方向。
+         - 开启演示时 updateMediaSession修改演示流方向为sendonly，对端回复是recvonly;  关闭演示采用ctrlPresentation流程，不采用sdp处理。
+         - 开启会控时 updateMediaSession修改主流方向为recvonly，对端回复是sendonly; 关闭会控时 updateMediaSession修改主流方向为inactive，对端回复是inactive；
+         - 同时开启演示和开启会控互不影响。    
       
             
