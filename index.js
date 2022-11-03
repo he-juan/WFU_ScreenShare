@@ -30,24 +30,27 @@ window.onload = function () {
 
 
                 // 测试页面添加的注册事件
-                // addEventHandler('shareScreen', function (data) {
-                //     console.warn("shareScreen: ", data)
-                // })
-                // addEventHandler('stopShareScreen', function (data) {
-                //     console.warn("stopShareScreen: ", data)
-                // })
-                // addEventHandler('shareScreenRequest', function (data) {
-                //     console.warn("shareScreenRequest: ", data)
-                // })
-                // addEventHandler('stopShareScreenRequest', function (data) {
-                //     console.warn("stopShareScreenRequest: ", data)
-                // })
-                // addEventHandler('hangup', function (data) {
-                //    console.warn("hangup: ", data)
-                // })
-                // addEventHandler('hangupRequest', function (data) {
-                //    console.warn("hangupRequest: ", data)
-                // })
+                window.gsRTC.on('shareScreen', function (data) {
+                    console.warn("shareScreen: ", data)
+                })
+                window.gsRTC.on('stopShareScreen', function (data) {
+                    console.warn("stopShareScreen: ", data)
+                })
+                window.gsRTC.on('shareScreenRequest', function (data) {
+                    console.warn("shareScreenRequest: ", data)
+                })
+                window.gsRTC.on('stopShareScreenRequest', function (data) {
+                    console.warn("stopShareScreenRequest: ", data)
+                })
+                window.gsRTC.on('hangup', function (data) {
+                   console.warn("hangup: ", data)
+                })
+                window.gsRTC.on('hangupRequest', function (data) {
+                   console.warn("hangupRequest: ", data)
+                })
+                window.gsRTC.on('onStreamChange',function(data){
+                    console.warn("onStreamChange:",data)
+                })
             }
         },
         500);
