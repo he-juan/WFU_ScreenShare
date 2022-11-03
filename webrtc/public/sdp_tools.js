@@ -1780,4 +1780,4 @@ let SDPTools = {
         }
         return sdpArray
     }
-}
+};
