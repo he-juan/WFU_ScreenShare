@@ -247,16 +247,16 @@ window.gsRTC.on('stopRemoteControl', (res) => {
  
   1. 创建通话：
   
-     - 首先`创建通话,调用接口call()`
+     - 首先创建通话,调用接口`window.call()`
      
   2.  开启共享 或者 关闭共享：
-      - 调用接口`beginScreen()`  或者 `stopScreen()`
+      - 调用接口`window.beginScreen()`  或者 `window.stopScreen()`
   
   3. 开启会控 或者 关闭会控：
-      - 调用接口`openRemoteControl()`  或者 `stopRemoteControl()`  
+      - 调用接口`window.openRemoteControl()`  或者 `window.stopRemoteControl()`  
       
   4. 关闭通话：  
-     - 调用接口`hangUP()`
+     - 调用接口`window.hangUP()`
      
   -------------------------------------------
      
