@@ -688,7 +688,7 @@ GsRTC.prototype.removeSSRC = function (sdp) {
             log.info('deleted stream info')
             delete parseSDP.media[i].ssrcGroups
             delete parseSDP.media[i].ssrcs
-            parseSDP.media[i].direction = 'recvonly'
+            parseSDP.media[i].direction = 'inactive'
         }
     }
     sdp = SDPTools.writeSDP(parseSDP)
