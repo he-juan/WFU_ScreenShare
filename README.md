@@ -150,6 +150,17 @@ window.gsRTC.on('stopRemoteControl', (res) => {
    console.log('获取流 ************************')
  })
  ```  
+ 
+ ```javascript
+   stream:stream.id,
+   type: "main",
+   isLocal: false,
+   streamType:"REMOTE_VIDEO_STREAM"
+ ```
+ - 参数说明：
+   - type: main   表示会控流
+   - type：slides  表示共享流
+   - isLocal: true  表示本地流，反之表示对端的流。
 
 ## 错误码说明
 
@@ -269,4 +280,5 @@ window.gsRTC.on('stopRemoteControl', (res) => {
          - 开启会控时 updateMediaSession修改主流方向为recvonly，对端回复是sendonly; 关闭会控时 updateMediaSession修改主流方向为inactive，对端回复是inactive；
          - 同时开启演示和开启会控互不影响。    
       
+     
             
